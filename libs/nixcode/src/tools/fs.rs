@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
-use std::path;
-use std::path::{absolute, PathBuf};
+use std::path::PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use nixcode_macros::tool;

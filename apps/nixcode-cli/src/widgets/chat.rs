@@ -1,4 +1,3 @@
-use std::ops::Sub;
 use std::sync::Arc;
 use crate::app::AppEvent;
 use crate::input_mode::InputMode;
@@ -22,7 +21,6 @@ use tokio::sync::mpsc::UnboundedSender;
 use nixcode::project::Project;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
-use nixcode_llm_sdk::tools::Tool;
 
 pub struct Chat {
     vertical_scroll_state: ScrollbarState,

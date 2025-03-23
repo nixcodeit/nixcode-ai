@@ -1,10 +1,9 @@
 use crate::app::AppEvent;
-use crate::input_mode::InputMode;
 use crate::user_input::UserSingleLineInput;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::prelude::{Span, Widget};
+use ratatui::layout::{Margin, Rect};
+use ratatui::prelude::Widget;
 use ratatui::widgets::{Block, Clear};
 
 pub struct CommandPopup {

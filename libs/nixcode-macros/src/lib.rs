@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
-use std::any::Any;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Error, FnArg, Ident, ItemFn, PatType, Type};
+use syn::{parse_macro_input, Error, FnArg, Ident, ItemFn, PatType, Type};
 
 #[proc_macro_attribute]
 pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {

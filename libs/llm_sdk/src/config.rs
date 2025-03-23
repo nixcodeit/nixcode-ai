@@ -1,5 +1,4 @@
 use secrecy::SecretString;
-use crate::tools::Tool;
 
 #[derive(Debug, Clone)]
 pub struct LLMConfig {

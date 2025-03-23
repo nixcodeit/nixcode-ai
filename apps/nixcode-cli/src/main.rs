@@ -1,11 +1,8 @@
 use app::App;
-use colored::Colorize;
 use dotenv::dotenv;
-use ratatui::prelude::*;
 use std::env;
 use std::env::current_dir;
 use std::path::PathBuf;
-use tokio_stream::StreamExt;
 use nixcode::project::Project;
 
 mod app;

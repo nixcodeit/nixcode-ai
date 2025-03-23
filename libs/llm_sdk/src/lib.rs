@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::AddAssign;
 use futures::StreamExt;
 use stop_reason::StopReason;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use crate::tools::Tool;
 
 pub type MessageResponseStream = UnboundedReceiver<MessageResponseStreamEvent>;

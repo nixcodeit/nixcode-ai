@@ -1,6 +1,6 @@
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::path::PathBuf;
 use glob::glob;
-use schemars::{json_schema, schema_for, JsonSchema};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use nixcode_macros::{tool};
