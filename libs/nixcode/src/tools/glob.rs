@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 use glob::glob;
 use schemars::{json_schema, schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,12 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
 
             result_str.push_str("Glob results:\n");
             for path in paths {
-                result_str.push_str(&format!("{:?}\n", path.display()));
+                let result = path.strip_prefix(project.get_cwd());
+                if result.is_err() {
+                    return json!(result.unwrap_err().to_string());
+                }
+
+                result_str.push_str(&format!("{:?}\n", result.unwrap()));
             }
 
             serde_json::to_value(result_str)

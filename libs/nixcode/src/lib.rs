@@ -11,6 +11,7 @@ use std::default::Default;
 use std::sync::Arc;
 use tokio::sync::mpsc::{unbounded_channel};
 use crate::project::Project;
+use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
 
 pub struct Nixcode {
     project: Project,
@@ -29,6 +30,10 @@ impl Nixcode {
                 let mut tools = Tools::new();
 
                 tools.add_tool(Arc::new(SearchGlobFilesTool {}));
+                tools.add_tool(Arc::new(CreateFileTool {}));
+                tools.add_tool(Arc::new(ReadTextFileTool {}));
+                tools.add_tool(Arc::new(UpdateTextFileTool {}));
+                tools.add_tool(Arc::new(DeleteFileTool {}));
 
                 tools
             },
