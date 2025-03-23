@@ -1,4 +1,5 @@
 mod tools;
+mod project;
 
 use crate::tools::glob::SearchGlobFilesTool;
 use crate::tools::Tools;
@@ -11,8 +12,6 @@ use std::default::Default;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
-
-type LLM = Arc<dyn LLMClientImpl>;
 
 pub struct Nixcode {
     working_directory: PathBuf,
@@ -58,10 +57,14 @@ impl Nixcode {
     }
 
     pub async fn send(&self, messages: Vec<Message>) -> Result<MessageResponseStream, LLMError> {
-        let request = Request::default()
+        let mut request = Request::default()
             .with_model(self.model.clone())
             .with_max_tokens(8192)
             .with_messages(messages);
+
+        if !self.tools.is_empty() {
+            request = request.with_tools(self.tools.get_all_tools());
+        }
 
         let mut stream = self.client.send(request).await?;
 

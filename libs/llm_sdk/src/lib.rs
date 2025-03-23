@@ -21,6 +21,7 @@ use std::ops::AddAssign;
 use futures::StreamExt;
 use stop_reason::StopReason;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use crate::tools::Tool;
 
 pub type MessageResponseStream = UnboundedReceiver<MessageResponseStreamEvent>;
 
@@ -51,6 +52,7 @@ pub struct Request {
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking: Option<ThinkingOptions>,
+    tools: Option<Vec<Tool>>,
 }
 
 impl Default for Request {
@@ -61,6 +63,7 @@ impl Default for Request {
             max_tokens: None,
             stream: true,
             thinking: None,
+            tools: None,
         }
     }
 }
@@ -88,6 +91,11 @@ impl Request {
 
     pub fn with_messages(mut self, messages: Vec<Message>) -> Self {
         self.messages = messages;
+        self
+    }
+
+    pub fn with_tools(mut self, tools: Vec<Tool>) -> Self {
+        self.tools = Some(tools);
         self
     }
 }

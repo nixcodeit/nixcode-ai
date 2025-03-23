@@ -24,6 +24,10 @@ impl Tools {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.hashmap.len() == 0
+    }
+
     pub fn add_tool(&mut self, tool: SafeTool) {
         self.hashmap.insert(tool.get_name(), tool);
     }
