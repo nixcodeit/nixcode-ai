@@ -6,6 +6,15 @@ fn default_value() -> String {
     "".to_string()
 }
 
+#[derive(Debug, Clone, Default)]
+pub enum ToolUseState {
+    #[default]
+    Created,
+    Executing,
+    Executed,
+    Error,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ToolUseContent {
@@ -15,6 +24,10 @@ pub struct ToolUseContent {
     #[serde(default = "default_value")]
     #[serde(skip_serializing)]
     _input_raw: String,
+    #[serde(skip)]
+    _tool_execution_state: ToolUseState,
+    #[serde(skip)]
+    _tool_result: Value,
 }
 
 impl ToolUseContent {
@@ -27,6 +40,26 @@ impl ToolUseContent {
 
     pub fn name_is(&self, name: impl Into<String>) -> bool {
         self.name == name.into()
+    }
+
+    pub fn get_tool_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_execute_params(&self) -> (String, Value) {
+        (self.name.clone(), self.input.clone())
+    }
+
+    pub fn get_id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn get_state(&self) -> ToolUseState {
+        self._tool_execution_state.clone()
+    }
+
+    pub(crate) fn set_state(&mut self, state: ToolUseState) {
+        self._tool_execution_state = state;
     }
 }
 
@@ -46,6 +79,16 @@ impl AddAssign<ContentInputJsonDelta> for ToolUseContent {
 pub struct ToolResultContent {
     tool_use_id: String,
     content: String,
+}
+
+impl ToolResultContent {
+    pub fn get_tool_use_id(&self) -> String {
+        self.tool_use_id.clone()
+    }
+
+    pub fn get_content(&self) -> String {
+        self.content.clone()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

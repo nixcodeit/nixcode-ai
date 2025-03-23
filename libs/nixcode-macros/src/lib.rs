@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use std::any::Any;
 use quote::quote;
 use syn::{parse_macro_input, Attribute, Error, FnArg, Ident, ItemFn, PatType, Type};
 
@@ -8,7 +9,6 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let func_name = &func.sig.ident;
     let tool_name = func_name.to_string();
-    let tool_name_snake_case = tool_name.to_lowercase();
     let tool_name_pascal_case = tool_name
         .split('_')
         .map(|s| {
@@ -20,10 +20,10 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
         .collect::<String>();
 
     // Extract function parameters
-    if func.sig.inputs.len() != 1 {
+    if func.sig.inputs.len() < 1 {
         return Error::new_spanned(
             &func.sig.inputs,
-            "Tool function must have exactly one parameter",
+            "Tool function must have minimum one parameter",
         )
         .to_compile_error()
         .into();
@@ -48,9 +48,6 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let param_ident = &param_type.path.segments.last().unwrap().ident;
-
-    let get_tool_name = format!("get_{}_tool", tool_name_snake_case);
-    let get_tool_ident = Ident::new(&get_tool_name, func_name.span());
     let struct_ident = Ident::new(&format!("{}Tool", tool_name_pascal_case), func_name.span());
 
     let expanded = quote! {
@@ -73,9 +70,9 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
                 nixcode_llm_sdk::tools::Tool::new(tool_name, description, parameters)
             }
 
-            fn execute(&self, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+            fn execute(&self, params: serde_json::Value, project: &crate::project::Project) -> anyhow::Result<serde_json::Value> {
                 let params: #param_ident = serde_json::from_value(params)?;
-                Ok(#func_name(params))
+                Ok(#func_name(params, project))
             }
         }
     };

@@ -13,17 +13,18 @@ use nixcode_llm_sdk::message::message::Message::{Assistant, User};
 use nixcode_llm_sdk::message::response::MessageResponse;
 use nixcode_llm_sdk::MessageResponseStreamEvent;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::prelude::{Style, Stylize};
+use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
+use nixcode::project::Project;
 use nixcode_llm_sdk::config::LLMConfig;
+use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
+use nixcode_llm_sdk::tools::Tool;
 
 pub struct Chat {
     vertical_scroll_state: ScrollbarState,
-    horizontal_scroll_state: ScrollbarState,
-
     messages: Vec<Message>,
     lines: Vec<Line<'static>>,
     paragraph: Paragraph<'static>,
@@ -31,26 +32,22 @@ pub struct Chat {
     input_mode: InputMode,
     app_event: UnboundedSender<AppEvent>,
     last_message_response: Option<MessageResponse>,
-
+    tools_to_execute: Vec<ToolUseContent>,
+    tools_results: Vec<ToolResultContent>,
     prompt: UserSingleLineInput,
     waiting: bool,
-
     area_size: (u16, u16),
-    content_size: (u16, u16),
-
     stick_to_bottom: bool,
-
     scroll: (u16, u16),
 }
 
 impl Chat {
-    pub fn new(input_mode: InputMode, app_event: UnboundedSender<AppEvent>) -> Result<Self> {
+    pub fn new(project: Project, input_mode: InputMode, app_event: UnboundedSender<AppEvent>) -> Result<Self> {
         let config = LLMConfig::new_anthropic()?;
 
         Ok(Chat {
             vertical_scroll_state: ScrollbarState::default(),
-            horizontal_scroll_state: ScrollbarState::default(),
-            client: Arc::new(Nixcode::new_anthropic(config).unwrap()),
+            client: Arc::new(Nixcode::new_anthropic(project, config).unwrap()),
             input_mode,
             app_event,
             prompt: Default::default(),
@@ -61,8 +58,9 @@ impl Chat {
             paragraph: Paragraph::new(Vec::new()),
             stick_to_bottom: true,
             area_size: (0, 0),
-            content_size: (0, 0),
             last_message_response: None,
+            tools_results: vec![],
+            tools_to_execute: vec![],
         })
     }
 
@@ -85,8 +83,6 @@ impl Chat {
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Char('j') | KeyCode::Up => self.scroll_up(),
                 KeyCode::Char('k') | KeyCode::Down => self.scroll_down(),
-                KeyCode::Char('h') | KeyCode::Left => self.scroll_left(),
-                KeyCode::Char('l') | KeyCode::Right => self.scroll_right(),
                 _ => (),
             },
             _ => (),
@@ -113,44 +109,55 @@ impl Chat {
         }
 
         let last_message = self.messages.last_mut().unwrap();
-        let mut last_response = self.last_message_response.as_mut().unwrap();
+        let last_response = self.last_message_response.as_mut().unwrap();
         match message {
+            MessageResponseStreamEvent::MessageStart(msg) => {
+                *last_response += msg;
+            },
+            MessageResponseStreamEvent::MessageDelta(delta) => {
+                *last_response += delta;
+            },
             MessageResponseStreamEvent::ContentBlockStart(content) => {
                 *last_response += content;
-            }
+            },
             MessageResponseStreamEvent::ContentBlockDelta(delta) => {
                 *last_response += delta;
+            },
+            MessageResponseStreamEvent::ContentBlockStop(content) => {
+                if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
+                    self.app_event.send(AppEvent::ToolAddToExecute(tool_use)).ok();
+                }
+            },
+            MessageResponseStreamEvent::MessageStop => {
+                self.app_event.send(AppEvent::ExecuteTools).ok();
             }
-            MessageResponseStreamEvent::ContentBlockStop(..) => {}
             _ => (),
         }
 
         last_message.set_content(last_response.content.clone());
 
-        self.recalculate_chat();
+        self.update_chat_widgets();
     }
 
-    fn recalculate_chat(&mut self) {
-        let lines: Vec<Line> = self
-            .messages
+    fn update_chat_widgets(&mut self) {
+        let lines: Vec<Line> = self.messages
             .clone()
             .into_iter()
-            .map(MessageWidget::new)
-            .flat_map(|m| m.get_lines(self.area_size.0))
+            .flat_map(MessageWidget::get_lines)
             .collect();
 
-
-        let p = Paragraph::new(lines.clone()).scroll(self.scroll)
+        let paragraph = Paragraph::new(lines.clone()).scroll(self.scroll)
             .wrap(Wrap { trim: true });
 
-        let line_count = p.line_count(self.area_size.0).saturating_sub(self.area_size.0 as usize);
+        let line_count = paragraph
+            .line_count(self.area_size.0).saturating_sub(self.area_size.0 as usize);
 
         self.vertical_scroll_state = self
             .vertical_scroll_state
             .content_length(line_count);
 
         self.lines = lines;
-        self.paragraph = p;
+        self.paragraph = paragraph;
 
         if self.stick_to_bottom {
             self.scroll_to_bottom();
@@ -180,27 +187,12 @@ impl Chat {
         self.stick_to_bottom = self.scroll.0 >= self.get_bottom_position();
     }
 
-    pub fn set_horizontal_scroll(&mut self, scroll: u16) {
-        self.scroll.1 = scroll;
-        self.horizontal_scroll_state = self.horizontal_scroll_state.position(scroll as usize);
-    }
-
-    pub fn scroll_left(&mut self) {
-        self.set_horizontal_scroll(self.scroll.1.saturating_sub(1));
-    }
-
-    pub fn scroll_right(&mut self) {
-        self.set_horizontal_scroll(self.scroll.1.saturating_add(1));
-    }
-
     pub fn scroll_to_bottom(&mut self) {
         self.set_vertical_scroll(self.get_bottom_position());
     }
 
     pub fn get_bottom_position(&self) -> u16 {
-        let waiting_line = if self.waiting { 1 } else { 0 };
         (self.lines.len() as u16)
-            .saturating_add(waiting_line)
             .saturating_sub(self.area_size.1)
     }
 
@@ -215,30 +207,23 @@ impl Chat {
 
     pub fn set_area_size(&mut self, size: (u16, u16)) {
         self.area_size = size;
-        let (width, height) = size;
+        let (_, height) = size;
 
         self.vertical_scroll_state = self
             .vertical_scroll_state
             .viewport_content_length(height as usize);
-
-        self.horizontal_scroll_state = self.
-            horizontal_scroll_state
-            .viewport_content_length(width as usize);
     }
 
     fn add_message(&mut self, message: Message) {
         self.messages.push(message);
-        self.recalculate_chat();
+        self.update_chat_widgets();
     }
 
-    async fn send_user_message(&mut self) {
-        let message = self.prompt.as_string();
-        let message = User(Content::new_text(message).into());
+    async fn send_message(&mut self, message: Message) {
         self.add_message(message);
 
         let tx = self.app_event.clone();
         let messages = self.messages.clone();
-        self.prompt.flush();
 
         let client = self.client.clone();
 
@@ -250,6 +235,7 @@ impl Chat {
                     tx.send(AppEvent::ChatError(err)).ok();
                     return;
                 }
+
                 let mut response = response.unwrap();
                 while let Some(data) = response.recv().await {
                     tx.send(AppEvent::ChatChunk(data)).ok();
@@ -258,6 +244,14 @@ impl Chat {
                 tx.send(AppEvent::ChatGeneratedResponse).ok();
             }
         });
+    }
+
+    async fn send_user_message(&mut self) {
+        let message = self.prompt.as_string();
+        let message = User(Content::new_text(message).into());
+        self.prompt.flush();
+
+        self.send_message(message).await;
     }
 
     pub fn handle_message_chunk(&mut self, chunk: MessageResponseStreamEvent) {
@@ -294,7 +288,11 @@ impl Chat {
         let mut main_area = Block::bordered().title("Chat");
 
         if self.waiting {
-            main_area = main_area.title_bottom(Span::styled(" Waiting for response ", Style::new().bold()));
+            main_area = main_area.title_bottom(
+                Span::styled(" Waiting for response ", Style::new().bold().italic())
+                    .add_modifier(Modifier::SLOW_BLINK)
+                    .add_modifier(Modifier::DIM)
+            );
         }
 
         let scroll = Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -313,5 +311,60 @@ impl Chat {
 
         frame.render_widget(Block::bordered().title("Input"), input_area);
         frame.render_widget(&self.prompt, input_inner_area);
+    }
+
+    pub fn add_tool_to_execute(&mut self, tool: ToolUseContent) {
+        self.tools_to_execute.push(tool);
+    }
+
+    pub fn start_tool(&mut self, tool: ToolUseContent) {
+        let last_message = self.messages.last_mut().unwrap();
+        last_message.set_tool_state(tool.get_id(), ToolUseState::Executing);
+    }
+
+    pub async fn tool_finished(&mut self, result: ToolResultContent) {
+        let tool_id = result.get_tool_use_id();
+        self.tools_results.push(result);
+
+        let last_message = self.messages.last_mut().unwrap();
+        last_message.set_tool_state(tool_id, ToolUseState::Executed);
+
+        if self.tools_results.len() == self.tools_to_execute.len() {
+            self.send_tools_results().await;
+        }
+    }
+
+    pub fn execute_tools(&mut self) {
+        let tools = self.tools_to_execute.clone();
+
+        for tool in tools {
+            tokio::spawn({
+                let client = self.client.clone();
+                let tx = self.app_event.clone();
+
+                async move {
+                    let (name, props) = tool.get_execute_params();
+                    tx.send(AppEvent::ToolStart(tool.clone())).ok();
+                    let result = client.execute_tool(name.as_str(), props);
+                    let result = if let Ok(value) = result {
+                        let value = serde_json::from_value(value).unwrap_or_else(|e| e.to_string());
+                        tool.create_response(value)
+                    } else {
+                        tool.create_response("Error executing tool".to_string())
+                    };
+                    tx.send(AppEvent::ToolEnd(result)).ok();
+                }
+            });
+        }
+    }
+
+    async fn send_tools_results(&mut self) {
+        let contents = self.tools_results.clone();
+        self.tools_results.clear();
+        self.tools_to_execute.clear();
+
+        let message = User(Content::new_tool_results(contents));
+
+        self.send_message(message).await;
     }
 }

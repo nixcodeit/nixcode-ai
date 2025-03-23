@@ -7,6 +7,8 @@ use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::MessageResponseStreamEvent;
 use ratatui::{DefaultTerminal, Frame};
 use tokio_stream::StreamExt;
+use nixcode::project::Project;
+use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
 
 #[allow(dead_code)]
 pub enum AppEvent {
@@ -16,6 +18,10 @@ pub enum AppEvent {
     ChatGeneratedResponse,
     ChatError(LLMError),
     ChatChunk(MessageResponseStreamEvent),
+    ExecuteTools,
+    ToolAddToExecute(ToolUseContent),
+    ToolStart(ToolUseContent),
+    ToolEnd(ToolResultContent),
     Quit,
     Render,
 }
@@ -38,11 +44,11 @@ pub struct App {
 }
 
 impl App {
-    pub(crate) fn new() -> Result<Self> {
+    pub(crate) fn new(project: Project) -> Result<Self> {
         let input_mode = InputMode::Normal;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
-        let chat = Chat::new(input_mode, tx.clone())?;
+        let chat = Chat::new(project, input_mode, tx.clone())?;
 
         Ok(App {
             input_mode,
@@ -143,6 +149,10 @@ impl App {
             AppEvent::ChatGeneratedResponse => self.chat_view.generated_response(),
             AppEvent::ChatError(err) => self.chat_view.handle_llm_error(err),
             AppEvent::ChatChunk(chunk) => self.chat_view.handle_message_chunk(chunk),
+            AppEvent::ToolStart(content) => self.chat_view.start_tool(content),
+            AppEvent::ToolAddToExecute(content) => self.chat_view.add_tool_to_execute(content),
+            AppEvent::ToolEnd(content) => self.chat_view.tool_finished(content).await,
+            AppEvent::ExecuteTools => self.chat_view.execute_tools(),
             AppEvent::Render => (),
         }
     }

@@ -13,10 +13,8 @@ use message::content::{Content, ContentDelta};
 use message::message::Message;
 use message::response::MessageResponse;
 use message::usage::{Usage, UsageDelta};
-use reqwest::header::AUTHORIZATION;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::ops::AddAssign;
 use futures::StreamExt;
 use stop_reason::StopReason;
@@ -131,7 +129,7 @@ pub struct ContentBlockDeltaEventContent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContentBlockStopEventContent {
-    index: usize,
+    pub index: usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

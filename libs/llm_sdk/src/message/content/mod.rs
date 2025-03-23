@@ -45,6 +45,16 @@ impl Content {
             _ => {}
         }
     }
+
+    pub fn is_tool_use(&self) -> bool {
+        matches!(self, Content::ToolUse(_))
+    }
+
+    pub(crate) fn set_tool_state(&mut self, state: tools::ToolUseState) {
+        if let Content::ToolUse(tool_use) = self {
+            tool_use.set_state(state);
+        }
+    }
 }
 
 impl Content {
@@ -58,6 +68,10 @@ impl Content {
 
     pub fn new_tool_use(tool_use: ToolUseContent) -> Self {
         Content::ToolUse(tool_use)
+    }
+
+    pub fn new_tool_results(results: Vec<ToolResultContent>) -> Vec<Content> {
+        results.into_iter().map(Content::new_tool_result).collect()
     }
 }
 

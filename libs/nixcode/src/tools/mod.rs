@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use lazy_static::lazy_static;
+use crate::project::Project;
 
 pub mod glob;
 
 pub trait Tool {
     fn get_name(&self) -> String;
     fn get_schema(&self) -> nixcode_llm_sdk::tools::Tool;
-    fn execute(&self, params: serde_json::Value) -> anyhow::Result<serde_json::Value>;
+    fn execute(&self, params: serde_json::Value, project: &Project) -> anyhow::Result<serde_json::Value>;
 }
 
 pub type SafeTool = Arc<dyn Tool + Send + Sync>;
@@ -40,9 +41,9 @@ impl Tools {
         self.hashmap.values().map(|tool| tool.get_schema()).collect()
     }
 
-    pub fn execute_tool(&self, name: &str, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    pub fn execute_tool(&self, name: &str, params: serde_json::Value, project: &Project) -> anyhow::Result<serde_json::Value> {
         if let Some(tool) = self.get_tool(name) {
-            tool.execute(params)
+            tool.execute(params, project)
         } else {
             Err(anyhow::anyhow!("Tool not found"))
         }

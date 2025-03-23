@@ -3,7 +3,10 @@ use colored::Colorize;
 use dotenv::dotenv;
 use ratatui::prelude::*;
 use std::env;
+use std::env::current_dir;
+use std::path::PathBuf;
 use tokio_stream::StreamExt;
+use nixcode::project::Project;
 
 mod app;
 mod command_popup;
@@ -22,8 +25,10 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
     validate_env_vars();
 
+    let project = Project::new(current_dir().unwrap_or(PathBuf::from(".")));
+
     let mut terminal = ratatui::init();
-    let mut app = App::new().expect("Failed to create app");
+    let mut app = App::new(project).expect("Failed to create app");
     let app_result = app.run(&mut terminal).await;
 
     ratatui::restore();
