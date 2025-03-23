@@ -25,8 +25,6 @@ AI assistance right in your terminal.
 - [x] Anthropic API integration
 - [x] Simple tool invocation framework
 - [x] Basic command popup
-- [x] Scrolling chat history in y-axis
-- [ ] Scrolling chat history in x-axis (or word wrapping)
 - [ ] OpenAI API integration
 - [ ] OpenRouter API integration
 - [ ] Groq API integration
