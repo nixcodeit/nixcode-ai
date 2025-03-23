@@ -1,3 +1,4 @@
+use std::ops::Sub;
 use std::sync::Arc;
 use crate::app::AppEvent;
 use crate::input_mode::InputMode;
@@ -36,9 +37,9 @@ pub struct Chat {
     tools_results: Vec<ToolResultContent>,
     prompt: UserSingleLineInput,
     waiting: bool,
-    area_size: (u16, u16),
+    area_size: (u16, u16), // (width, height)
     stick_to_bottom: bool,
-    scroll: (u16, u16),
+    scroll: (u16, u16), // (y, x)
 }
 
 impl Chat {
@@ -146,22 +147,25 @@ impl Chat {
             .flat_map(MessageWidget::get_lines)
             .collect();
 
-        let paragraph = Paragraph::new(lines.clone()).scroll(self.scroll)
+        let mut paragraph = Paragraph::new(lines.clone())
             .wrap(Wrap { trim: true });
 
         let line_count = paragraph
-            .line_count(self.area_size.0).saturating_sub(self.area_size.0 as usize);
+            .line_count(paragraph.line_width() as u16)
+            .saturating_sub(self.area_size.1 as usize);
 
         self.vertical_scroll_state = self
             .vertical_scroll_state
             .content_length(line_count);
 
-        self.lines = lines;
-        self.paragraph = paragraph;
-
         if self.stick_to_bottom {
             self.scroll_to_bottom();
         }
+
+        paragraph = paragraph.scroll(self.scroll);
+
+        self.paragraph = paragraph;
+        self.lines = lines;
     }
 
     pub fn handle_llm_error(&mut self, error: LLMError) {
@@ -188,12 +192,14 @@ impl Chat {
     }
 
     pub fn scroll_to_bottom(&mut self) {
-        self.set_vertical_scroll(self.get_bottom_position());
+        let pos = self.get_bottom_position();
+        self.set_vertical_scroll(pos);
     }
 
-    pub fn get_bottom_position(&self) -> u16 {
-        (self.lines.len() as u16)
-            .saturating_sub(self.area_size.1)
+    fn get_bottom_position(&self) -> u16 {
+        self.paragraph
+            .line_count(self.paragraph.line_width() as u16)
+            .saturating_sub(self.area_size.1 as usize) as u16
     }
 
     pub fn reset_scroll(&mut self) {
