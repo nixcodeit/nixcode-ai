@@ -1,0 +1,19 @@
+[package]
+name = "nixcode"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nixcode_llm_sdk = { path = "../llm_sdk" }
+tokio = { version = "1.44.1", features = ["fs", "macros", "rt-multi-thread"] }
+reqwest = { version = "0.12.15" }
+eventsource-stream = "0.2.3"
+secrecy = "0.10.3"
+futures = "0.3.31"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+glob = { version = "0.3.2" }
+schemars = { version = "1.0.0-alpha.17", features = ["derive"] }
+nixcode-macros = { path = "../nixcode-macros" }
+anyhow = { version = "1.0.97" }
+lazy_static = "1.5.0"

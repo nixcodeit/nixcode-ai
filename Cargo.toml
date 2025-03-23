@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["apps/nixcode-cli", "libs/llm_sdk", "libs/nixcode", "libs/nixcode-macros"]
