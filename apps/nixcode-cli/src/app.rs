@@ -6,6 +6,8 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::MessageResponseStreamEvent;
 use ratatui::{DefaultTerminal, Frame};
+use ratatui::prelude::{Modifier, Stylize};
+use ratatui::widgets::Block;
 use tokio_stream::StreamExt;
 use nixcode::project::Project;
 use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
@@ -180,11 +182,12 @@ impl App {
         let mut cursor_position: Option<Position> = None;
 
         if let InputMode::Command = self.input_mode {
-            let area = crate::popup_utils::popup_area(area, 60);
-            let (x, y) = self.command_popup.get_input_position(area);
+            let popup_area = crate::popup_utils::popup_area(area, 60);
+            let (x, y) = self.command_popup.get_input_position(popup_area);
             cursor_position = Some(Position::new(x, y));
 
-            frame.render_widget(&self.command_popup, area);
+            frame.render_widget(Block::new().add_modifier(Modifier::DIM), main_area);
+            frame.render_widget(&self.command_popup, popup_area);
         } else if let InputMode::Insert = self.input_mode {
             let (x, y) = self.chat_view.get_cursor_position(main_area);
             cursor_position = Some(Position::new(x, y));
