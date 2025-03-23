@@ -11,6 +11,10 @@ impl TextContent {
     pub fn new(text: String) -> Self {
         Self { text }
     }
+
+    pub fn get_text(&self) -> String {
+        self.text.clone()
+    }
 }
 
 impl Into<String> for TextContent {

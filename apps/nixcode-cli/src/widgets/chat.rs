@@ -13,18 +13,20 @@ use nixcode_llm_sdk::message::message::Message::{Assistant, User};
 use nixcode_llm_sdk::message::response::MessageResponse;
 use nixcode_llm_sdk::MessageResponseStreamEvent;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::prelude::Stylize;
-use ratatui::text::Line;
-use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
+use ratatui::prelude::{Style, Stylize};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 use nixcode_llm_sdk::config::LLMConfig;
 
 pub struct Chat {
     vertical_scroll_state: ScrollbarState,
+    horizontal_scroll_state: ScrollbarState,
 
     messages: Vec<Message>,
-    lines: Vec<String>,
+    lines: Vec<Line<'static>>,
+    paragraph: Paragraph<'static>,
     client: Arc<Nixcode>,
     input_mode: InputMode,
     app_event: UnboundedSender<AppEvent>,
@@ -33,7 +35,8 @@ pub struct Chat {
     prompt: UserSingleLineInput,
     waiting: bool,
 
-    area_height: u16,
+    area_size: (u16, u16),
+    content_size: (u16, u16),
 
     stick_to_bottom: bool,
 
@@ -46,6 +49,7 @@ impl Chat {
 
         Ok(Chat {
             vertical_scroll_state: ScrollbarState::default(),
+            horizontal_scroll_state: ScrollbarState::default(),
             client: Arc::new(Nixcode::new_anthropic(config).unwrap()),
             input_mode,
             app_event,
@@ -54,8 +58,10 @@ impl Chat {
             scroll: (0, 0),
             waiting: false,
             lines: Vec::new(),
+            paragraph: Paragraph::new(Vec::new()),
             stick_to_bottom: true,
-            area_height: 0,
+            area_size: (0, 0),
+            content_size: (0, 0),
             last_message_response: None,
         })
     }
@@ -79,6 +85,8 @@ impl Chat {
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Char('j') | KeyCode::Up => self.scroll_up(),
                 KeyCode::Char('k') | KeyCode::Down => self.scroll_down(),
+                KeyCode::Char('h') | KeyCode::Left => self.scroll_left(),
+                KeyCode::Char('l') | KeyCode::Right => self.scroll_right(),
                 _ => (),
             },
             _ => (),
@@ -123,24 +131,30 @@ impl Chat {
     }
 
     fn recalculate_chat(&mut self) {
-        let lines: Vec<String> = self
+        let lines: Vec<Line> = self
             .messages
             .clone()
             .into_iter()
             .map(MessageWidget::new)
-            .flat_map(|m| m.get_lines())
-            .flat_map(|string_line| {
-                string_line
-                    .split("\n")
-                    .map(|l| l.to_string())
-                    .collect::<Vec<String>>()
-            })
+            .flat_map(|m| m.get_lines(self.area_size.0))
             .collect();
 
-        let len = lines.len().saturating_sub(self.area_height as usize);
-        self.vertical_scroll_state = self.vertical_scroll_state.content_length(len);
+
+        let p = Paragraph::new(lines.clone()).scroll(self.scroll)
+            .wrap(Wrap { trim: true });
+
+        let line_count = p.line_count(self.area_size.0).saturating_sub(self.area_size.0 as usize);
+
+        self.vertical_scroll_state = self
+            .vertical_scroll_state
+            .content_length(line_count);
+
         self.lines = lines;
-        self.scroll_to_bottom();
+        self.paragraph = p;
+
+        if self.stick_to_bottom {
+            self.scroll_to_bottom();
+        }
     }
 
     pub fn handle_llm_error(&mut self, error: LLMError) {
@@ -166,6 +180,19 @@ impl Chat {
         self.stick_to_bottom = self.scroll.0 >= self.get_bottom_position();
     }
 
+    pub fn set_horizontal_scroll(&mut self, scroll: u16) {
+        self.scroll.1 = scroll;
+        self.horizontal_scroll_state = self.horizontal_scroll_state.position(scroll as usize);
+    }
+
+    pub fn scroll_left(&mut self) {
+        self.set_horizontal_scroll(self.scroll.1.saturating_sub(1));
+    }
+
+    pub fn scroll_right(&mut self) {
+        self.set_horizontal_scroll(self.scroll.1.saturating_add(1));
+    }
+
     pub fn scroll_to_bottom(&mut self) {
         self.set_vertical_scroll(self.get_bottom_position());
     }
@@ -174,7 +201,7 @@ impl Chat {
         let waiting_line = if self.waiting { 1 } else { 0 };
         (self.lines.len() as u16)
             .saturating_add(waiting_line)
-            .saturating_sub(self.area_height)
+            .saturating_sub(self.area_size.1)
     }
 
     pub fn reset_scroll(&mut self) {
@@ -186,11 +213,17 @@ impl Chat {
         self.set_vertical_scroll(0);
     }
 
-    pub fn set_area_height(&mut self, height: u16) {
-        self.area_height = height;
+    pub fn set_area_size(&mut self, size: (u16, u16)) {
+        self.area_size = size;
+        let (width, height) = size;
+
         self.vertical_scroll_state = self
             .vertical_scroll_state
             .viewport_content_length(height as usize);
+
+        self.horizontal_scroll_state = self.
+            horizontal_scroll_state
+            .viewport_content_length(width as usize);
     }
 
     fn add_message(&mut self, message: Message) {
@@ -255,28 +288,21 @@ impl Chat {
     }
 
     fn render_chat(&mut self, frame: &mut Frame, area: Rect) {
-        frame.render_widget(Block::bordered().title("Chat"), area);
-
         let inner = area.inner(Margin::new(1, 1));
-        self.set_area_height(inner.height);
+        self.set_area_size((inner.width, inner.height));
 
-        let mut lines: Vec<Line> = self.lines.iter().map(|l| Line::from(l.clone())).collect();
+        let mut main_area = Block::bordered().title("Chat");
 
         if self.waiting {
-            lines.push(Line::from("Waiting for response...").bold().italic().gray());
+            main_area = main_area.title_bottom(Span::styled(" Waiting for response ", Style::new().bold()));
         }
-
-        if self.stick_to_bottom {
-            self.scroll_to_bottom();
-        }
-
-        let paragraph = Paragraph::new(lines).scroll(self.scroll);
 
         let scroll = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓"));
 
-        frame.render_widget(paragraph, inner);
+        frame.render_widget(main_area, area);
+        frame.render_widget(&self.paragraph, inner);
         frame.render_stateful_widget(scroll, inner, &mut self.vertical_scroll_state);
     }
 
