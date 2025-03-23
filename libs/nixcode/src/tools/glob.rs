@@ -49,8 +49,11 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
                 if result.is_err() {
                     return json!(result.unwrap_err().to_string());
                 }
+                let result = result.unwrap().to_str();
 
-                result_str.push_str(&format!("{:?}\n", result.unwrap()));
+                if let Some(path) = result {
+                    result_str.push_str(&format!("{}\n", path));
+                }
             }
 
             serde_json::to_value(result_str)
