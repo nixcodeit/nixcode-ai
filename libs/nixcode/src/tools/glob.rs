@@ -63,6 +63,13 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
                     if !include_git && (path.starts_with(".git") || path.contains(".git/")) {
                         continue;
                     }
+                    // TODO: change to more elegant way, read gitignore or smth
+                    if path.starts_with(".")
+                        || path.contains("/.")
+                        || path.starts_with("target/")
+                        || path.contains("node_modules/") {
+                        continue;
+                    }
                     result_str.push_str(&format!("{}\n", path));
                 }
             }
