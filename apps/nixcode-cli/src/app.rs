@@ -24,6 +24,8 @@ pub enum AppEvent {
     ToolAddToExecute(ToolUseContent),
     ToolStart(ToolUseContent),
     ToolEnd(ToolResultContent),
+    RetryLastMessage,
+    ClearChat,
     Quit,
     Render,
 }
@@ -41,6 +43,7 @@ pub struct App {
     input_mode: InputMode,
 
     rx: tokio::sync::mpsc::UnboundedReceiver<AppEvent>,
+    tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
 
     command_popup: CommandPopup,
 }
@@ -59,6 +62,7 @@ impl App {
             command_popup: CommandPopup::new(tx.clone()),
             chat_view: chat,
             rx,
+            tx,
         })
     }
 
@@ -145,7 +149,7 @@ impl App {
     async fn handle_app_event(&mut self, event: AppEvent) {
         match event {
             AppEvent::SetInputMode(mode) => self.set_input_mode(mode),
-            AppEvent::Command(command) => self.execute_command(command),
+            AppEvent::Command(command) => self.execute_command(command).await,
             AppEvent::Quit => self.quit(),
             AppEvent::ChatGeneratingResponse => self.chat_view.waiting_for_response(),
             AppEvent::ChatGeneratedResponse => self.chat_view.generated_response(),
@@ -156,6 +160,8 @@ impl App {
             AppEvent::ToolEnd(content) => self.chat_view.tool_finished(content).await,
             AppEvent::ExecuteTools => self.chat_view.execute_tools(),
             AppEvent::Render => (),
+            AppEvent::RetryLastMessage => self.chat_view.retry_last_message().await,
+            AppEvent::ClearChat => self.chat_view.clear_chat(),
         }
     }
 
@@ -198,12 +204,12 @@ impl App {
         }
     }
 
-    fn execute_command(&mut self, command: String) {
+    async fn execute_command(&mut self, command: String) {
         let command = command.trim();
         match command {
             "exit" | "quit" | "q" => self.quit(),
-            "settings" => self.show_settings(),
-            "chat" => self.show_chat_view(),
+            "clear" => { self.tx.send(AppEvent::ClearChat).ok(); },
+            "retry" => { self.tx.send(AppEvent::RetryLastMessage).ok(); },
             _ => (),
         }
 

@@ -253,8 +253,10 @@ impl Chat {
         self.update_chat_widgets();
     }
 
-    async fn send_message(&mut self, message: Message) {
-        self.add_message(message);
+    async fn send_message(&mut self, message: Option<Message>) {
+        if let Some(message) = message {
+            self.add_message(message);
+        }
 
         let tx = self.app_event.clone();
         let messages = self.messages.clone();
@@ -281,11 +283,15 @@ impl Chat {
     }
 
     async fn send_user_message(&mut self) {
+        if self.waiting {
+            return;
+        }
+
         let message = self.prompt.as_string();
         let message = User(Content::new_text(message).into());
         self.prompt.flush();
 
-        self.send_message(message).await;
+        self.send_message(Some(message)).await;
     }
 
     pub fn handle_message_chunk(&mut self, chunk: MessageResponseStreamEvent) {
@@ -403,6 +409,30 @@ impl Chat {
 
         let message = User(Content::new_tool_results(contents));
 
-        self.send_message(message).await;
+        self.send_message(Some(message)).await;
+    }
+
+    pub fn clear_chat(&mut self) {
+        if self.waiting {
+            return;
+        }
+
+        self.last_message_response = None;
+        self.tools_results.clear();
+        self.tools_to_execute.clear();
+        self.messages.clear();
+        self.lines.clear();
+        self.paragraph = Paragraph::new(Vec::new());
+        self.vertical_scroll_state = ScrollbarState::default();
+        self.scroll = 0;
+        self.total_lines = 0;
+    }
+
+    pub async fn retry_last_message(&mut self) {
+        if self.messages.len() == 0 || self.waiting {
+            return;
+        }
+
+        self.send_message(None).await;
     }
 }
