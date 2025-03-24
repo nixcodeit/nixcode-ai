@@ -37,11 +37,12 @@ pub struct DeleteFileParams {
 pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::Value {
     use std::fs::File;
     use std::io::Write;
+    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
     let cwd = project.get_cwd();
-    let path = join_path(cwd.clone(), file_path);
+    let path = fs::join_path(cwd.clone(), file_path);
     if path.is_err() {
         return serde_json::json!(path.unwrap_err().to_string());
     }
@@ -65,11 +66,12 @@ pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::V
 #[tool("Read file content")]
 pub fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_json::Value {
     use std::fs::read_to_string;
+    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
     let cwd = project.get_cwd();
-    let path = join_path(cwd.clone(), file_path);
+    let path = fs::join_path(cwd.clone(), file_path);
     if path.is_err() {
         return serde_json::json!(path.unwrap_err().to_string());
     }
@@ -93,11 +95,12 @@ pub fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_js
 fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_json::Value {
     use std::fs::File;
     use std::io::Write;
+    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
     let cwd = project.get_cwd();
-    let path = join_path(cwd.clone(), file_path);
+    let path = fs::join_path(cwd.clone(), file_path);
     if path.is_err() {
         return serde_json::json!(path.unwrap_err().to_string());
     }
@@ -121,11 +124,12 @@ fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_js
 #[tool("Delete file")]
 fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value {
     use std::fs::remove_file;
+    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
     let cwd = project.get_cwd();
-    let path = join_path(cwd.clone(), file_path);
+    let path = fs::join_path(cwd.clone(), file_path);
     if path.is_err() {
         return serde_json::json!(path.unwrap_err().to_string());
     }
@@ -145,29 +149,9 @@ fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value
     }
 }
 
-fn join_path(base: impl Into<PathBuf>, path: impl Into<PathBuf>) -> anyhow::Result<PathBuf> {
-    let path = path.into();
-    let mut base = base.into();
-
-    if path.is_absolute() {
-        return Err(anyhow::anyhow!("Path must be relative"));
-    }
-
-    for part in path.iter() {
-        if part == OsStr::new("..") {
-            if !base.pop() {
-                return Err(anyhow::anyhow!("Path exceeds base directory"));
-            }
-        } else if part != OsStr::new(".") && part != OsStr::new("/") {
-            base.push(part);
-        }
-    }
-
-    Ok(base)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::utils::fs::join_path;
     use super::*;
 
     #[test]
