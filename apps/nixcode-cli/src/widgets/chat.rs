@@ -37,7 +37,8 @@ pub struct Chat {
     waiting: bool,
     area_size: (u16, u16), // (width, height)
     stick_to_bottom: bool,
-    scroll: (u16, u16), // (y, x)
+    scroll: usize, // Simplified to a single value for vertical scrolling
+    total_lines: usize, // Keep track of total line count
 }
 
 impl Chat {
@@ -51,7 +52,7 @@ impl Chat {
             app_event,
             prompt: Default::default(),
             messages: Vec::new(),
-            scroll: (0, 0),
+            scroll: 0,
             waiting: false,
             lines: Vec::new(),
             paragraph: Paragraph::new(Vec::new()),
@@ -60,6 +61,7 @@ impl Chat {
             last_message_response: None,
             tools_results: vec![],
             tools_to_execute: vec![],
+            total_lines: 0,
         })
     }
 
@@ -80,8 +82,8 @@ impl Chat {
     async fn handle_normal_input_events(&mut self, event: &Event) {
         match event {
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
-                KeyCode::Char('j') | KeyCode::Up => self.scroll_up(),
-                KeyCode::Char('k') | KeyCode::Down => self.scroll_down(),
+                KeyCode::Char('j') | KeyCode::Down => self.scroll_down(),
+                KeyCode::Char('k') | KeyCode::Up => self.scroll_up(),
                 _ => (),
             },
             _ => (),
@@ -145,25 +147,29 @@ impl Chat {
             .flat_map(MessageWidget::get_lines)
             .collect();
 
-        let mut paragraph = Paragraph::new(lines.clone())
+        self.paragraph = Paragraph::new(lines.clone())
             .wrap(Wrap { trim: true });
 
-        let line_count = paragraph
-            .line_count(paragraph.line_width() as u16)
-            .saturating_sub(self.area_size.1 as usize);
+        // Calculate the total line count based on the content and area width
+        let total_lines = if self.area_size.0 > 0 {
+            let line_width = self.area_size.0 as usize;
+            self.paragraph.line_count(line_width as u16)
+        } else {
+            lines.len()
+        };
 
-        self.vertical_scroll_state = self
-            .vertical_scroll_state
-            .content_length(line_count);
+        self.total_lines = total_lines;
+        self.lines = lines;
 
+        // Update scrollbar state with new content length
+        self.vertical_scroll_state = self.vertical_scroll_state
+            .content_length(self.total_lines.saturating_sub(self.area_size.1 as usize))
+            .viewport_content_length(self.area_size.1 as usize);
+
+        // If sticking to bottom, update scroll position
         if self.stick_to_bottom {
             self.scroll_to_bottom();
         }
-
-        paragraph = paragraph.scroll(self.scroll);
-
-        self.paragraph = paragraph;
-        self.lines = lines;
     }
 
     pub fn handle_llm_error(&mut self, error: LLMError) {
@@ -172,50 +178,74 @@ impl Chat {
         eprintln!("{:?}", error);
     }
 
-    pub fn set_vertical_scroll(&mut self, scroll: u16) {
-        self.scroll.0 = scroll;
-        self.vertical_scroll_state = self.vertical_scroll_state.position(scroll as usize);
+    // Simplified to use a single scroll value
+    pub fn set_vertical_scroll(&mut self, scroll: usize) {
+        let max_scroll = self.get_max_scroll();
+        self.scroll = scroll.min(max_scroll);
+        self.vertical_scroll_state = self.vertical_scroll_state.position(self.scroll);
     }
 
     pub fn scroll_up(&mut self) {
-        self.set_vertical_scroll(self.scroll.0.saturating_sub(1));
-
-        self.stick_to_bottom = self.scroll.0 >= self.get_bottom_position();
+        if self.scroll > 0 {
+            self.set_vertical_scroll(self.scroll - 1);
+            // Only update stick_to_bottom if we're not at the bottom anymore
+            self.stick_to_bottom = self.scroll >= self.get_max_scroll();
+        }
     }
 
     pub fn scroll_down(&mut self) {
-        self.set_vertical_scroll(self.scroll.0.saturating_add(1));
-
-        self.stick_to_bottom = self.scroll.0 >= self.get_bottom_position();
+        let max_scroll = self.get_max_scroll();
+        if self.scroll < max_scroll {
+            self.set_vertical_scroll(self.scroll + 1);
+            // Check if we reached the bottom
+            self.stick_to_bottom = self.scroll >= max_scroll;
+        }
     }
 
     pub fn scroll_to_bottom(&mut self) {
-        let pos = self.get_bottom_position();
-        self.set_vertical_scroll(pos);
+        let max_scroll = self.get_max_scroll();
+        self.set_vertical_scroll(max_scroll);
+        self.stick_to_bottom = true;
     }
 
-    fn get_bottom_position(&self) -> u16 {
-        self.paragraph
-            .line_count(self.paragraph.line_width() as u16)
-            .saturating_sub(self.area_size.1 as usize) as u16
+    // Calculate maximum valid scroll position
+    fn get_max_scroll(&self) -> usize {
+        let viewport_height = self.area_size.1 as usize;
+        if self.total_lines <= viewport_height {
+            0
+        } else {
+            self.total_lines - viewport_height
+        }
     }
 
     pub fn reset_scroll(&mut self) {
         if self.stick_to_bottom {
             self.scroll_to_bottom();
-            return;
+        } else {
+            self.set_vertical_scroll(0);
         }
-
-        self.set_vertical_scroll(0);
     }
 
     pub fn set_area_size(&mut self, size: (u16, u16)) {
+        let old_size = self.area_size;
         self.area_size = size;
-        let (_, height) = size;
 
-        self.vertical_scroll_state = self
-            .vertical_scroll_state
-            .viewport_content_length(height as usize);
+        // If the area width changed, we need to recalculate line wrapping
+        if old_size.0 != size.0 {
+            self.update_chat_widgets();
+        } else {
+            // Just update the scrollbar viewport height
+            self.vertical_scroll_state = self.vertical_scroll_state
+                .viewport_content_length(size.1 as usize);
+
+            // Check if we need to adjust scroll position
+            if self.stick_to_bottom {
+                self.scroll_to_bottom();
+            } else {
+                // Make sure scroll position is still valid
+                self.set_vertical_scroll(self.scroll);
+            }
+        }
     }
 
     fn add_message(&mut self, message: Message) {
@@ -304,7 +334,11 @@ impl Chat {
             .end_symbol(Some("↓"));
 
         frame.render_widget(main_area, area);
-        frame.render_widget(&self.paragraph, inner);
+
+        // Apply the scroll to the paragraph
+        let scrolled_paragraph = self.paragraph.clone().scroll((self.scroll as u16, 0));
+        frame.render_widget(scrolled_paragraph, inner);
+        
         frame.render_stateful_widget(scroll, inner, &mut self.vertical_scroll_state);
     }
 
