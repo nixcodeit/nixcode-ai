@@ -1061,6 +1061,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
