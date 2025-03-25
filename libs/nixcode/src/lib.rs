@@ -1,18 +1,21 @@
 mod tools;
 pub mod project;
 mod utils;
+mod prompts;
 
+use crate::project::Project;
+use crate::prompts::system::SYSTEM_PROMPT;
+use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
 use crate::tools::glob::SearchGlobFilesTool;
 use crate::tools::Tools;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
+use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request};
 use std::default::Default;
 use std::sync::Arc;
-use tokio::sync::mpsc::{unbounded_channel};
-use crate::project::Project;
-use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
+use tokio::sync::mpsc::unbounded_channel;
 
 pub struct Nixcode {
     project: Project,
@@ -60,7 +63,9 @@ impl Nixcode {
         let mut request = Request::default()
             .with_model(self.model.clone())
             .with_max_tokens(8192)
-            .with_messages(messages);
+            .with_messages(messages)
+            .with_system_prompt(vec![Content::new_text(SYSTEM_PROMPT)])
+            .with_cache();
 
         if !self.tools.is_empty() {
             request = request.with_tools(self.tools.get_all_tools());

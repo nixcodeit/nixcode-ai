@@ -1,26 +1,27 @@
-use std::sync::Arc;
 use crate::app::AppEvent;
 use crate::input_mode::InputMode;
 use crate::user_input::UserSingleLineInput;
 use crate::widgets::message_widget::MessageWidget;
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
+use nixcode::project::Project;
 use nixcode::Nixcode;
+use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
+use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::message::message::Message::{Assistant, User};
 use nixcode_llm_sdk::message::response::MessageResponse;
+use nixcode_llm_sdk::message::usage::Usage;
 use nixcode_llm_sdk::MessageResponseStreamEvent;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use nixcode::project::Project;
-use nixcode_llm_sdk::config::LLMConfig;
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
 
 pub struct Chat {
     vertical_scroll_state: ScrollbarState,
@@ -39,6 +40,8 @@ pub struct Chat {
     stick_to_bottom: bool,
     scroll: usize, // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
+
+    usage: Usage,
 }
 
 impl Chat {
@@ -62,6 +65,7 @@ impl Chat {
             tools_results: vec![],
             tools_to_execute: vec![],
             total_lines: 0,
+            usage: Usage::default(),
         })
     }
 
@@ -130,6 +134,7 @@ impl Chat {
                 }
             },
             MessageResponseStreamEvent::MessageStop => {
+                self.usage += last_response.usage.clone();
                 self.app_event.send(AppEvent::ExecuteTools).ok();
             }
             _ => (),
@@ -325,7 +330,13 @@ impl Chat {
         let inner = area.inner(Margin::new(1, 1));
         self.set_area_size((inner.width, inner.height));
 
-        let mut main_area = Block::bordered().title("Chat");
+        let create_input_cache_cost = self.usage.cache_creation_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 3.75;
+        let read_input_cache_cost = self.usage.cache_read_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 0.30;
+        let input_cost = self.usage.input_tokens as f64 / 1_000_000.0 * 3.0;
+        let output_cost = self.usage.output_tokens as f64 / 1_000_000.0 * 15.0;
+        let total_cost = create_input_cache_cost + read_input_cache_cost + input_cost + output_cost;
+        let mut main_area = Block::bordered().title("Chat")
+            .title_bottom(Line::raw(format!(" Cost: ${:.4} ", total_cost)).right_aligned());
 
         if self.waiting {
             main_area = main_area.title_bottom(
@@ -426,6 +437,7 @@ impl Chat {
         self.vertical_scroll_state = ScrollbarState::default();
         self.scroll = 0;
         self.total_lines = 0;
+        self.usage = Usage::default();
     }
 
     pub async fn retry_last_message(&mut self) {

@@ -6,20 +6,21 @@ pub mod providers;
 pub mod stop_reason;
 pub mod tools;
 
+use crate::tools::Tool;
 use config::LLMConfig;
 use errors::llm::LLMError;
 use eventsource_stream::{Event, Eventsource};
+use futures::StreamExt;
 use message::content::{Content, ContentDelta};
 use message::message::Message;
 use message::response::MessageResponse;
 use message::usage::{Usage, UsageDelta};
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::ops::AddAssign;
-use futures::StreamExt;
 use stop_reason::StopReason;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
-use crate::tools::Tool;
 
 pub type MessageResponseStream = UnboundedReceiver<MessageResponseStreamEvent>;
 
@@ -51,6 +52,10 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking: Option<ThinkingOptions>,
     tools: Option<Vec<Tool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<Vec<Content>>,
+    #[serde(skip)]
+    _cache: Option<bool>,
 }
 
 impl Default for Request {
@@ -62,6 +67,8 @@ impl Default for Request {
             stream: true,
             thinking: None,
             tools: None,
+            system: None,
+            _cache: None,
         }
     }
 }
@@ -95,6 +102,20 @@ impl Request {
     pub fn with_tools(mut self, tools: Vec<Tool>) -> Self {
         self.tools = Some(tools);
         self
+    }
+
+    pub fn with_system_prompt(mut self, system: Vec<Content>) -> Self {
+        self.system = Some(system);
+        self
+    }
+
+    pub fn with_cache(mut self) -> Self {
+        self._cache = Some(true);
+        self
+    }
+
+    pub fn is_cache_enabled(&self) -> bool {
+        self._cache.unwrap_or(false)
     }
 }
 
@@ -354,7 +375,58 @@ impl LLMClientImpl for AnthropicClient {
         Ok(body.unwrap().input_tokens)
     }
     async fn send(&self, request: Request) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
-        let body = serde_json::to_value(&request).unwrap();
+        let mut body = serde_json::to_value(&request).unwrap();
+        if request.is_cache_enabled() && !request.messages.is_empty() {
+            body
+                .as_object_mut()
+                .unwrap()
+                .get_mut("messages")
+                .unwrap()
+                .as_array_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .get_mut("content")
+                .unwrap()
+                .as_array_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert("cache_control".into(), json!({"type": "ephemeral"}));
+
+            if request.system.is_some() {
+                body
+                    .as_object_mut()
+                    .unwrap()
+                    .get_mut("system")
+                    .unwrap()
+                    .as_array_mut()
+                    .unwrap()
+                    .last_mut()
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("cache_control".into(), json!({"type": "ephemeral"}));
+            }
+            if request.tools.is_some() {
+                body
+                    .as_object_mut()
+                    .unwrap()
+                    .get_mut("tools")
+                    .unwrap()
+                    .as_array_mut()
+                    .unwrap()
+                    .last_mut()
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("cache_control".into(), json!({"type": "ephemeral"}));
+            }
+        }
 
         let result = self
             .client

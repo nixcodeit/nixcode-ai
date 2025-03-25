@@ -1,4 +1,3 @@
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
