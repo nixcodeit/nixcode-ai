@@ -3,15 +3,15 @@ use crate::input_mode::InputMode;
 use crate::widgets::chat::Chat;
 use anyhow::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
+use nixcode::Nixcode;
 use nixcode_llm_sdk::errors::llm::LLMError;
+use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
 use nixcode_llm_sdk::MessageResponseStreamEvent;
-use ratatui::{DefaultTerminal, Frame};
 use ratatui::prelude::{Modifier, Stylize};
 use ratatui::widgets::Block;
-use tokio_stream::StreamExt;
-use nixcode::Nixcode;
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
+use ratatui::{DefaultTerminal, Frame};
 use std::sync::Arc;
+use tokio_stream::StreamExt;
 
 #[allow(dead_code)]
 pub enum AppEvent {
@@ -111,9 +111,6 @@ impl App {
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Char(':') => {
                     self.set_input_mode(InputMode::Command);
-                }
-                KeyCode::Char('q') => {
-                    self.quit();
                 }
                 KeyCode::Char('i') => {
                     self.set_input_mode(InputMode::Insert);
