@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use crate::project::Project;
 use glob::glob;
+use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use nixcode_macros::{tool};
-use crate::project::Project;
+use std::path::PathBuf;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct GlobToolParams {
@@ -14,6 +14,10 @@ pub struct GlobToolParams {
     #[schemars(description = "Include .git directory in search (default: false)")]
     #[serde(default)]
     include_git: Option<bool>,
+
+    #[schemars(description = "Offset for search results (default: 0)")]
+    #[serde(default)]
+    offset: Option<usize>,
 }
 
 #[tool("Search for files in project directory using glob pattern")]
@@ -33,6 +37,7 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
         return json!(pattern.unwrap_err().to_string());
     }
 
+    let offset = params.offset.unwrap_or(0);
     let pattern = pattern.unwrap();
 
     let result = glob(pattern.to_str().unwrap());
@@ -52,25 +57,39 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
             }
 
             result_str.push_str("Glob results:\n");
-            for path in paths {
+            let paths = paths.iter().map(|path| {
                 let result = path.strip_prefix(project.get_cwd());
                 if result.is_err() {
-                    return json!(result.unwrap_err().to_string());
+                    return None;
                 }
-                let result = result.unwrap().to_str();
 
-                if let Some(path) = result {
+                result.unwrap().to_str()
+            })
+                .filter(|path| path.is_some())
+                .map(|path| path.unwrap().to_string())
+                .filter(|path| {
                     if !include_git && (path.starts_with(".git") || path.contains(".git/")) {
-                        continue;
+                        return false;
+                    } else if include_git && path.starts_with(".git") {
+                        return true;
                     }
-                    // TODO: change to more elegant way, read gitignore or smth
-                    if path.starts_with(".")
+
+                    !(path.starts_with(".")
                         || path.contains("/.")
                         || path.starts_with("target/")
-                        || path.contains("node_modules/") {
-                        continue;
-                    }
-                    result_str.push_str(&format!("{}\n", path));
+                        || path.contains("node_modules/"))
+                }).collect::<Vec<_>>();
+
+            let missing_results = paths.len().saturating_sub(offset + 100);
+            paths.iter().skip(offset).take(100).for_each(|path| {
+                result_str.push_str(&format!("{}\n", path));
+            });
+
+            if missing_results > 0 {
+                if offset > 0 {
+                    result_str.push_str(&format!("... and {} more files (current offset: {}), reuse tool with offset parameter", missing_results, offset));
+                } else {
+                    result_str.push_str(&format!("... and {} more files, reuse tool with offset parameter", missing_results));
                 }
             }
 
@@ -84,10 +103,10 @@ pub fn search_glob_files(params: GlobToolParams, project: &Project) -> serde_jso
 
 #[cfg(test)]
 mod tests {
-    use std::env::current_dir;
     use super::*;
     use crate::project::Project;
     use serde_json::json;
+    use std::env::current_dir;
 
     #[test]
     fn test_empty_result() {
@@ -95,6 +114,7 @@ mod tests {
         let params = GlobToolParams {
             pattern: "_not_existing_file.xyz.json".to_string(),
             include_git: None,
+            offset: None,
         };
 
         let result = search_glob_files(params, &project);
@@ -108,6 +128,7 @@ mod tests {
         let params = GlobToolParams {
             pattern: "Cargo.toml".to_string(),
             include_git: None,
+            offset: None,
         };
 
         let result = search_glob_files(params, &project);
@@ -121,6 +142,7 @@ mod tests {
         let params = GlobToolParams {
             pattern: "../../.git/*".to_string(),
             include_git: Some(true),
+            offset: None,
         };
 
         let result = search_glob_files(params, &project).to_string();
@@ -134,10 +156,39 @@ mod tests {
         let params = GlobToolParams {
             pattern: ".git/*".to_string(),
             include_git: None,
+            offset: None,
         };
 
         let result = search_glob_files(params, &project).to_string();
         let expected = json!("No files found").to_string();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_many_files() {
+        let project = Project::new(PathBuf::from("/Users/nix/GIT/nixcode-ai"));
+        let params = GlobToolParams {
+            pattern: "**/*".to_string(),
+            include_git: Some(true),
+            offset: None,
+        };
+
+        let result = search_glob_files(params, &project).to_string();
+
+        assert!(result.to_string().contains("reuse tool with offset parameter"));
+    }
+
+    #[test]
+    fn test_many_files_offset() {
+        let project = Project::new(PathBuf::from("/Users/nix/GIT/nixcode-ai"));
+        let params = GlobToolParams {
+            pattern: "**/*".to_string(),
+            include_git: Some(true),
+            offset: Some(100),
+        };
+
+        let result = search_glob_files(params, &project).to_string();
+
+        assert!(result.to_string().contains("current offset: 100"));
     }
 }
