@@ -7,7 +7,8 @@ use unicode_width::UnicodeWidthStr;
 
 pub struct UserSingleLineInput {
     data: String,
-    cursor: usize,
+    cursor: usize,        // Cursor position in characters (not bytes)
+    cursor_byte: usize,   // Cursor position in bytes
     scroll_offset: usize, // Track horizontal scroll position
     last_area_width: u16, // Remember the last area width for proper cursor handling
 }
@@ -17,6 +18,7 @@ impl Default for UserSingleLineInput {
         Self {
             data: String::new(),
             cursor: 0,
+            cursor_byte: 0,
             scroll_offset: 0,
             last_area_width: 0,
         }
@@ -25,11 +27,13 @@ impl Default for UserSingleLineInput {
 
 impl UserSingleLineInput {
     pub fn new(data: String) -> Self {
-        let data_len = data.len();
+        let char_count = data.chars().count();
+        let byte_count = data.len();
 
         Self {
             data,
-            cursor: data_len,
+            cursor: char_count,
+            cursor_byte: byte_count,
             scroll_offset: 0,
             last_area_width: 0,
         }
@@ -40,22 +44,49 @@ impl UserSingleLineInput {
     }
 
     pub fn insert(&mut self, c: char) {
-        self.data.insert(self.cursor, c);
+        self.data.insert(self.cursor_byte, c);
         self.cursor += 1;
+        self.cursor_byte += c.len_utf8();
         self.adjust_scroll_offset();
     }
 
     pub fn handle_backspace(&mut self) {
         if self.cursor > 0 {
-            self.data.remove(self.cursor - 1);
+            // Find the byte position of the previous character
+            let prev_char_byte_pos = self.data[..self.cursor_byte]
+                .char_indices()
+                .rev()
+                .next()
+                .map(|(idx, _)| idx)
+                .unwrap_or(0);
+            
+            // Calculate the size of the character to be removed
+            let char_size = self.cursor_byte - prev_char_byte_pos;
+            
+            // Remove the character
+            self.data.remove(prev_char_byte_pos);
+            
+            // Update cursors
             self.cursor -= 1;
+            self.cursor_byte -= char_size;
+            
             self.adjust_scroll_offset();
         }
     }
 
     pub fn handle_delete(&mut self) {
-        if self.cursor < self.data.len() {
-            self.data.remove(self.cursor);
+        if self.cursor < self.data.chars().count() {
+            // Get the size of the character at cursor
+            let char_size = self.data[self.cursor_byte..]
+                .chars()
+                .next()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            
+            // Remove the character
+            self.data.remove(self.cursor_byte);
+            
+            // No need to update cursors as we're deleting the character under cursor
             self.adjust_scroll_offset();
         }
     }
@@ -63,13 +94,28 @@ impl UserSingleLineInput {
     pub fn flush(&mut self) {
         self.data.clear();
         self.cursor = 0;
+        self.cursor_byte = 0;
         self.scroll_offset = 0;
     }
 
     pub fn move_cursor(&mut self, offset: i16) {
-        let new_cursor = (self.cursor as i16 + offset).clamp(0, self.data.len() as i16);
-        self.cursor = new_cursor as usize;
-        self.adjust_scroll_offset();
+        // Calculate new cursor position (in characters)
+        let char_count = self.data.chars().count();
+        let new_cursor = (self.cursor as i16 + offset).clamp(0, char_count as i16);
+        
+        if new_cursor as usize != self.cursor {
+            // If cursor position changed, update both character and byte position
+            self.cursor = new_cursor as usize;
+            
+            // Calculate the new byte position
+            self.cursor_byte = self.data
+                .char_indices()
+                .nth(self.cursor)
+                .map(|(idx, _)| idx)
+                .unwrap_or(self.data.len());
+                
+            self.adjust_scroll_offset();
+        }
     }
 
     // Adjust scroll offset to ensure cursor is visible
@@ -79,7 +125,10 @@ impl UserSingleLineInput {
         }
 
         let visible_width = self.last_area_width as usize;
-        let cursor_width = self.data[..self.cursor].width();
+        
+        // Get text up to cursor in characters (not bytes)
+        let text_before_cursor = self.data.chars().take(self.cursor).collect::<String>();
+        let cursor_width = text_before_cursor.width();
         
         // Reserve 1 character of margin on the right edge
         let right_margin = 1;
@@ -105,10 +154,12 @@ impl UserSingleLineInput {
                     crossterm::event::KeyCode::Right => self.move_cursor(1),
                     crossterm::event::KeyCode::Home => {
                         self.cursor = 0;
+                        self.cursor_byte = 0;
                         self.scroll_offset = 0;
                     },
                     crossterm::event::KeyCode::End => {
-                        self.cursor = self.data.len();
+                        self.cursor = self.data.chars().count();
+                        self.cursor_byte = self.data.len();
                         self.adjust_scroll_offset();
                     },
                     crossterm::event::KeyCode::Backspace => self.handle_backspace(),
@@ -125,22 +176,22 @@ impl UserSingleLineInput {
         &self.data
     }
 
-    pub fn get_visible_data(&self, width: usize) -> &str {
+    pub fn get_visible_data(&self, width: usize) -> String {
         let data_width = self.data.width();
 
         // If the entire text fits within width or there's no text
         if data_width <= width || self.data.is_empty() {
-            return &self.data;
+            return self.data.clone();
         }
 
         // Find the substring to display based on scroll offset
         let mut width_so_far = 0;
-        let mut start_idx = 0;
+        let mut start_char_idx = 0;
         
-        // Find start index based on scroll offset
-        for (idx, c) in self.data.char_indices() {
+        // Find start character index based on scroll offset
+        for (idx, c) in self.data.chars().enumerate() {
             if width_so_far >= self.scroll_offset {
-                start_idx = idx;
+                start_char_idx = idx;
                 break;
             }
             width_so_far += c.width().unwrap_or(1);
@@ -148,24 +199,30 @@ impl UserSingleLineInput {
 
         // For end index, we'll try to fill the entire width
         width_so_far = 0;
-        let mut end_idx = self.data.len();
+        let mut end_char_idx = self.data.chars().count();
         
-        for (idx, c) in self.data[start_idx..].char_indices() {
+        for (idx, c) in self.data.chars().skip(start_char_idx).enumerate() {
             let char_width = c.width().unwrap_or(1);
+            
             // Check if adding this character would exceed the available width
             if width_so_far + char_width > width {
-                end_idx = start_idx + idx;
+                end_char_idx = start_char_idx + idx;
                 break;
             }
             width_so_far += char_width;
         }
 
-        &self.data[start_idx..end_idx]
+        // Extract the visible portion of text by character (not byte) indices
+        self.data.chars()
+            .skip(start_char_idx)
+            .take(end_char_idx - start_char_idx)
+            .collect()
     }
 
     pub fn get_cursor_position(&self, area: Rect) -> (u16, u16) {
         // Calculate visible cursor position accounting for scroll offset
-        let text_before_cursor = &self.data[..self.cursor];
+        // Get text up to cursor in characters (not bytes)
+        let text_before_cursor = self.data.chars().take(self.cursor).collect::<String>();
         let cursor_width = text_before_cursor.width();
         
         // Calculate cursor position in visible area
@@ -189,6 +246,7 @@ impl Widget for &UserSingleLineInput {
         let mut mutable_self = UserSingleLineInput {
             data: self.data.clone(),
             cursor: self.cursor,
+            cursor_byte: self.cursor_byte,
             scroll_offset: self.scroll_offset,
             last_area_width: self.last_area_width,
         };
