@@ -54,6 +54,7 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
 
         pub struct #struct_ident {}
 
+        #[async_trait::async_trait]
         impl crate::tools::Tool for #struct_ident {
             fn get_name(&self) -> String {
                 #tool_name.to_string()
@@ -69,9 +70,9 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
                 nixcode_llm_sdk::tools::Tool::new(tool_name, description, parameters)
             }
 
-            fn execute(&self, params: serde_json::Value, project: &crate::project::Project) -> anyhow::Result<serde_json::Value> {
+            async fn execute(&self, params: serde_json::Value, project: &crate::project::Project) -> anyhow::Result<serde_json::Value> {
                 let params: #param_ident = serde_json::from_value(params)?;
-                Ok(#func_name(params, project))
+                Ok(#func_name(params, project).await)
             }
         }
     };

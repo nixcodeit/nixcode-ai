@@ -2,7 +2,6 @@ use crate::project::Project;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -34,9 +33,9 @@ pub struct DeleteFileParams {
 }
 
 #[tool("Create empty file in given path")]
-pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::Value {
-    use std::fs::File;
-    use std::io::Write;
+pub async fn create_file(params: CreateFileParams, project: &Project) -> serde_json::Value {
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
     use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
@@ -54,16 +53,16 @@ pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::V
 
     // create directories if they don't exist
     let parent = path.parent().unwrap();
-    let create_dirs_result = std::fs::create_dir_all(parent);
+    let create_dirs_result = tokio::fs::create_dir_all(parent).await;
     if create_dirs_result.is_err() {
         return serde_json::json!(create_dirs_result.unwrap_err().to_string());
     }
 
-    let file = File::create(&path);
+    let file = File::create(&path).await;
 
     match file {
         Ok(mut f) => {
-            f.write_all(b"").unwrap();
+            f.write_all(b"").await.unwrap();
             serde_json::json!("File created")
         }
         Err(e) => serde_json::json!(e.to_string())
@@ -71,8 +70,8 @@ pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::V
 }
 
 #[tool("Read file content")]
-pub fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_json::Value {
-    use std::fs::read_to_string;
+pub async fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_json::Value {
+    use tokio::fs::read_to_string;
     use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
@@ -88,7 +87,7 @@ pub fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_js
         return serde_json::json!("Path must be inside project directory");
     }
 
-    let file = read_to_string(&path);
+    let file = read_to_string(&path).await;
 
     match file {
         Ok(content) => {
@@ -99,9 +98,9 @@ pub fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_js
 }
 
 #[tool("Update file content")]
-fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_json::Value {
-    use std::fs::File;
-    use std::io::Write;
+pub async fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_json::Value {
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
     use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
@@ -117,11 +116,11 @@ fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_js
         return serde_json::json!("Path must be inside project directory");
     }
 
-    let file = File::create(&path);
+    let file = File::create(&path).await;
 
     match file {
         Ok(mut f) => {
-            f.write_all(params.content.as_bytes()).unwrap();
+            f.write_all(params.content.as_bytes()).await.unwrap();
             serde_json::json!("File updated")
         }
         Err(e) => serde_json::json!(e.to_string())
@@ -129,8 +128,8 @@ fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_js
 }
 
 #[tool("Delete file")]
-fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value {
-    use std::fs::remove_file;
+pub async fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value {
+    use tokio::fs::remove_file;
     use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
@@ -146,7 +145,7 @@ fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value
         return serde_json::json!("Path must be inside project directory");
     }
 
-    let file = remove_file(&path);
+    let file = remove_file(&path).await;
 
     match file {
         Ok(_) => {
@@ -191,26 +190,26 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_no_create_file() {
+    #[tokio::test]
+    async fn test_no_create_file() {
         let project = Project::new(PathBuf::from("/tmp"));
         let params = CreateFileParams {
             path: String::from("./../foo.txt"),
         };
 
-        let result = create_file(params, &project);
+        let result = create_file(params, &project).await;
 
         assert_eq!(result, serde_json::json!("Path must be inside project directory"));
     }
 
-    #[test]
-    fn test_create_file() {
+    #[tokio::test]
+    async fn test_create_file() {
         let project = Project::new(PathBuf::from("/tmp"));
         let params = CreateFileParams {
             path: String::from("foo.txt"),
         };
 
-        let result = create_file(params, &project);
+        let result = create_file(params, &project).await;
 
         assert_eq!(result, serde_json::json!("File created"));
     }

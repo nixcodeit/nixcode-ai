@@ -10,8 +10,10 @@ impl Project {
     pub fn new(cwd: PathBuf) -> Self {
         let init_analysis_path = cwd.join(".nixcode/init.md");
         let mut project_init_analysis_content = None;
-        if let Ok(_) = std::fs::exists(init_analysis_path.as_path()) {
-            project_init_analysis_content = Some(std::fs::read_to_string(init_analysis_path).unwrap());
+        if let Ok(exists) = std::fs::exists(init_analysis_path.as_path()) {
+            if exists {
+                project_init_analysis_content = Some(std::fs::read_to_string(init_analysis_path).unwrap());
+            }
         }
         Self { cwd, project_init_analysis_content }
     }

@@ -438,7 +438,8 @@ impl Chat {
                 async move {
                     let (name, props) = tool.get_execute_params();
                     tx.send(AppEvent::ToolStart(tool.clone())).ok();
-                    let result = client.execute_tool(name.as_str(), props);
+                    let result = client.execute_tool(name.as_str(), props).await;
+
                     let result = if let Ok(value) = result {
                         let value = serde_json::from_value(value).unwrap_or_else(|e| e.to_string());
                         tool.create_response(value)

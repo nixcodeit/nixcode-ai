@@ -28,7 +28,7 @@ pub struct Nixcode {
 impl Nixcode {
     pub fn new(project: Project, client: LLMClient) -> anyhow::Result<Self, LLMError> {
         let has_init_analysis = project.has_init_analysis();
-        
+
         Ok(Self {
             project,
             client,
@@ -98,12 +98,12 @@ impl Nixcode {
         Ok(rx)
     }
 
-    pub fn execute_tool(
+    pub async fn execute_tool(
         &self,
         name: &str,
         params: serde_json::Value,
     ) -> anyhow::Result<serde_json::Value> {
-        self.tools.execute_tool(name, params, &self.project)
+        self.tools.execute_tool(name, params, &self.project).await
     }
 
     pub fn has_init_analysis(&self) -> bool {
