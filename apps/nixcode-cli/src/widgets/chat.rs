@@ -353,10 +353,28 @@ impl Chat {
         let input_tokens = self.usage.input_tokens;
         let output_tokens = self.usage.output_tokens;
 
-        let mut main_area = Block::bordered().title(" Chat ")
+        let mut main_area = Block::bordered()
+            .title(" Chat ")
             .border_type(BorderType::Rounded)
             .title_bottom(Line::raw(format!(" ${:.4} ", total_cost)).right_aligned())
             .title_bottom(Line::raw(format!(" Cache (R/W): ({}, {}), Input: {}, Output: {} ", cache_read_tokens, cache_write_tokens, input_tokens, output_tokens)).centered());
+
+
+        if !self.client.has_init_analysis() {
+            main_area = main_area.title(
+                Line::from(" Project analysis not initialized ")
+                    .red()
+                    .bold()
+                    .right_aligned()
+            );
+        } else {
+            main_area = main_area.title(
+                Line::from(" Project analysis initialized ")
+                    .green()
+                    .bold()
+                    .right_aligned()
+            );
+        }
 
         if self.waiting {
             main_area = main_area.title_bottom(

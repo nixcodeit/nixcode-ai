@@ -7,6 +7,7 @@ use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
 use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
 use crate::tools::glob::SearchGlobFilesTool;
+use crate::tools::prompt::GetProjectAnalysisPromptTool;
 use crate::tools::Tools;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
@@ -26,6 +27,8 @@ pub struct Nixcode {
 
 impl Nixcode {
     pub fn new(project: Project, client: LLMClient) -> anyhow::Result<Self, LLMError> {
+        let has_init_analysis = project.has_init_analysis();
+        
         Ok(Self {
             project,
             client,
@@ -38,6 +41,10 @@ impl Nixcode {
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
                 tools.add_tool(Arc::new(UpdateTextFileTool {}));
                 tools.add_tool(Arc::new(DeleteFileTool {}));
+
+                if !has_init_analysis {
+                    tools.add_tool(Arc::new(GetProjectAnalysisPromptTool {}));
+                }
 
                 tools
             },
@@ -60,11 +67,17 @@ impl Nixcode {
     }
 
     pub async fn send(&self, messages: Vec<Message>) -> Result<MessageResponseStream, LLMError> {
+        let mut system_prompt = vec![Content::new_text(SYSTEM_PROMPT)];
+        let project_init_analysis_content = self.project.get_project_init_analysis_content();
+        if let Some(content) = project_init_analysis_content {
+            system_prompt.push(Content::new_text(content));
+        }
+
         let mut request = Request::default()
             .with_model(self.model.clone())
             .with_max_tokens(51200)
             .with_messages(messages)
-            .with_system_prompt(vec![Content::new_text(SYSTEM_PROMPT)])
+            .with_system_prompt(system_prompt)
             .with_thinking(ThinkingOptions::new(8192))
             .with_cache();
 
@@ -91,5 +104,9 @@ impl Nixcode {
         params: serde_json::Value,
     ) -> anyhow::Result<serde_json::Value> {
         self.tools.execute_tool(name, params, &self.project)
+    }
+
+    pub fn has_init_analysis(&self) -> bool {
+        self.project.has_init_analysis()
     }
 }

@@ -4,6 +4,7 @@ use crate::project::Project;
 
 pub mod glob;
 pub mod fs;
+pub mod prompt;
 
 pub trait Tool {
     fn get_name(&self) -> String;
