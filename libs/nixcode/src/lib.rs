@@ -13,7 +13,7 @@ use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
-use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request, ThinkingOptions};
+use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request};
 use std::default::Default;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
@@ -78,7 +78,7 @@ impl Nixcode {
             .with_max_tokens(51200)
             .with_messages(messages)
             .with_system_prompt(system_prompt)
-            .with_thinking(ThinkingOptions::new(8192))
+            // .with_thinking(ThinkingOptions::new(8192))
             .with_cache();
 
         if !self.tools.is_empty() {
