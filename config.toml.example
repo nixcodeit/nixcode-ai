@@ -1,0 +1,26 @@
+# nixcode-ai Configuration Example
+# Copy this file to ~/.config/nixcode/config.toml (Unix) or %APPDATA%\nixcode\config.toml (Windows)
+# Or create a project-specific config in .nixcode/config.toml
+
+# General LLM settings
+[llm]
+# Default provider to use (anthropic or openai)
+default_provider = "anthropic"
+# Override the default model for all providers (optional)
+# default_model = "claude-3-haiku"
+
+# Provider-specific settings
+[providers]
+# Anthropic settings
+[providers.anthropic]
+# API key (use ${ENV_VAR} syntax to reference environment variables)
+api_key = "${ANTHROPIC_API_KEY}"
+# Default model for Anthropic
+default_model = "claude-3-haiku"
+
+# OpenAI settings
+[providers.openai]
+# API key (use ${ENV_VAR} syntax to reference environment variables)
+api_key = "${OPENAI_API_KEY}"
+# Default model for OpenAI
+default_model = "gpt-4o-mini"

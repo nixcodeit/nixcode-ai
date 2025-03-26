@@ -2,11 +2,8 @@ use crate::app::AppEvent;
 use crate::input_mode::InputMode;
 use crate::user_input::UserSingleLineInput;
 use crate::widgets::message_widget::MessageWidget;
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use nixcode::project::Project;
 use nixcode::Nixcode;
-use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
 use nixcode_llm_sdk::message::content::Content;
@@ -41,17 +38,14 @@ pub struct Chat {
     scroll: usize, // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
     llm_error: Option<ErrorContent>,
-
     usage: Usage,
 }
 
 impl Chat {
-    pub fn new(project: Project, input_mode: InputMode, app_event: UnboundedSender<AppEvent>) -> Result<Self> {
-        let config = LLMConfig::new_anthropic()?;
-
-        Ok(Chat {
+    pub fn new(client: Arc<Nixcode>, input_mode: InputMode, app_event: UnboundedSender<AppEvent>) -> Self {
+        Chat {
             vertical_scroll_state: ScrollbarState::default(),
-            client: Arc::new(Nixcode::new_anthropic(project, config).unwrap()),
+            client,
             input_mode,
             app_event,
             prompt: Default::default(),
@@ -68,7 +62,7 @@ impl Chat {
             total_lines: 0,
             usage: Usage::default(),
             llm_error: None,
-        })
+        }
     }
 
     pub fn set_input_mode(&mut self, mode: InputMode) {
@@ -353,8 +347,12 @@ impl Chat {
         let input_tokens = self.usage.input_tokens;
         let output_tokens = self.usage.output_tokens;
 
+        // Add provider info to the title
+        let provider = &self.client.get_config().llm.default_provider;
+        let model = &self.client.get_model();
+
         let mut main_area = Block::bordered()
-            .title(" Chat ")
+            .title(format!(" Chat [{}/{}] ", provider, model))
             .border_type(BorderType::Rounded)
             .title_bottom(Line::raw(format!(" ${:.4} ", total_cost)).right_aligned())
             .title_bottom(Line::raw(format!(" Cache (R/W): ({}, {}), Input: {}, Output: {} ", cache_read_tokens, cache_write_tokens, input_tokens, output_tokens)).centered());

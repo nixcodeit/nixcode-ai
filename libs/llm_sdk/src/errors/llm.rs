@@ -12,6 +12,7 @@ pub enum LLMError {
     NetworkError,
     Timeout,
     InputTooLong,
+    MissingAPIKey,
     Generic(String),
 }
 
@@ -30,6 +31,7 @@ impl Into<Error> for LLMError {
             LLMError::NetworkError => Error::msg("Network error"),
             LLMError::Timeout => Error::msg("Timeout"),
             LLMError::InputTooLong => Error::msg("Input too long"),
+            LLMError::MissingAPIKey => Error::msg("Missing API key"),
             LLMError::Generic(e) => Error::msg(e),
         }
     }
@@ -48,6 +50,7 @@ impl Into<ErrorContent> for LLMError {
                 LLMError::NetworkError => "network_error".into(),
                 LLMError::Timeout => "timeout".into(),
                 LLMError::InputTooLong => "input_too_long".into(),
+                LLMError::MissingAPIKey => "missing_api_key".into(),
                 LLMError::Generic(_) => "generic".into(),
             },
             message: match self {
@@ -63,6 +66,7 @@ impl Into<ErrorContent> for LLMError {
                 LLMError::NetworkError => "Network error".into(),
                 LLMError::Timeout => "Timeout".into(),
                 LLMError::InputTooLong => "Input too long".into(),
+                LLMError::MissingAPIKey => "Missing API key. Please provide in config file or environment variable.".into(),
                 LLMError::Generic(e) => e,
             },
         }

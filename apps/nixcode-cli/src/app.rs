@@ -9,8 +9,9 @@ use ratatui::{DefaultTerminal, Frame};
 use ratatui::prelude::{Modifier, Stylize};
 use ratatui::widgets::Block;
 use tokio_stream::StreamExt;
-use nixcode::project::Project;
+use nixcode::Nixcode;
 use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
+use std::sync::Arc;
 
 #[allow(dead_code)]
 pub enum AppEvent {
@@ -49,11 +50,12 @@ pub struct App {
 }
 
 impl App {
-    pub(crate) fn new(project: Project) -> Result<Self> {
+    pub(crate) fn new(nixcode: Nixcode) -> Result<Self> {
         let input_mode = InputMode::Normal;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
-        let chat = Chat::new(project, input_mode, tx.clone())?;
+        let nixcode = Arc::new(nixcode);
+        let chat = Chat::new(nixcode, input_mode, tx.clone());
 
         Ok(App {
             input_mode,

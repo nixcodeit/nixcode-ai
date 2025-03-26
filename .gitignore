@@ -1,3 +1,4 @@
 .github/issues
 /target
 .env*
+.nixcode/config.toml

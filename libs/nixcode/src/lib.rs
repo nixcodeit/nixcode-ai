@@ -2,19 +2,24 @@ mod tools;
 pub mod project;
 mod utils;
 mod prompts;
+pub mod config;
 
+use crate::config::Config;
 use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
 use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
 use crate::tools::glob::SearchGlobFilesTool;
 use crate::tools::prompt::GetProjectAnalysisPromptTool;
 use crate::tools::Tools;
+use anyhow::Result;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request};
+use secrecy::SecretString;
 use std::default::Default;
+use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
 
@@ -23,16 +28,19 @@ pub struct Nixcode {
     client: LLMClient,
     model: String,
     tools: Tools,
+    config: Config,
 }
 
 impl Nixcode {
-    pub fn new(project: Project, client: LLMClient) -> anyhow::Result<Self, LLMError> {
+    pub fn new(project: Project, client: LLMClient, config: Config) -> anyhow::Result<Self, LLMError> {
         let has_init_analysis = project.has_init_analysis();
+        let model = config.get_model_for_provider(&config.llm.default_provider);
 
         Ok(Self {
             project,
             client,
-            model: "claude-3-7-sonnet-20250219".into(),
+            model,
+            config,
             tools: {
                 let mut tools = Tools::new();
 
@@ -51,14 +59,59 @@ impl Nixcode {
         })
     }
 
+    /// Creates a new Nixcode instance with configuration from files or environment
+    pub fn new_from_env(project: Project) -> anyhow::Result<Self, LLMError> {
+        // Try to load configuration, fallback to defaults if it fails
+        let config = Config::load().unwrap_or_else(|_| Config::new());
+        Self::new_with_config(project, config)
+    }
+
+    /// Creates a new Nixcode instance with provided configuration
+    pub fn new_with_config(project: Project, config: Config) -> anyhow::Result<Self, LLMError> {
+        let provider = &config.llm.default_provider;
+
+        // Try to get API key for the provider
+        let api_key_result = config.get_api_key_for_provider(provider);
+
+        match (provider.as_str(), api_key_result) {
+            // Anthropic with available API key
+            ("anthropic", Ok(api_key)) => {
+                let llm_config = LLMConfig { api_key };
+                let client = LLMClient::new_anthropic(llm_config)?;
+                Self::new(project, client, config)
+            },
+            // OpenAI with available API key
+            ("openai", Ok(api_key)) => {
+                let llm_config = LLMConfig { api_key };
+                let client = LLMClient::new_openai(llm_config)?;
+                Self::new(project, client, config)
+            },
+            // Fallback to environment variables for Anthropic
+            (_, _) => {
+                let api_key = env::var("ANTHROPIC_API_KEY")
+                    .map_err(|_| LLMError::MissingAPIKey)?;
+
+                let llm_config = LLMConfig {
+                    api_key: SecretString::new(api_key.into()),
+                };
+
+                let client = LLMClient::new_anthropic(llm_config)?;
+                Self::new(project, client, config)
+            }
+        }
+    }
+
+    // Legacy methods kept for compatibility
     pub fn new_anthropic(project: Project, config: LLMConfig) -> anyhow::Result<Self, LLMError> {
+        let app_config = Config::load().unwrap_or_else(|_| Config::new());
         let client = LLMClient::new_anthropic(config)?;
-        Self::new(project, client)
+        Self::new(project, client, app_config)
     }
 
     pub fn new_openai(project: Project, config: LLMConfig) -> anyhow::Result<Self, LLMError> {
+        let app_config = Config::load().unwrap_or_else(|_| Config::new());
         let client = LLMClient::new_openai(config)?;
-        Self::new(project, client)
+        Self::new(project, client, app_config)
     }
 
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
@@ -108,5 +161,13 @@ impl Nixcode {
 
     pub fn has_init_analysis(&self) -> bool {
         self.project.has_init_analysis()
+    }
+
+    pub fn get_config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn get_model(&self) -> &str {
+        &self.model
     }
 }

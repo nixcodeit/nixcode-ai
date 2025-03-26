@@ -17,6 +17,7 @@ AI assistance right in your terminal.
 - Streaming responses from Claude AI
 - Tool invocation framework allowing AI to use external tools
 - Command popup for executing special commands
+- Configurable via external TOML configuration files
 
 ## Todos
 
@@ -25,10 +26,10 @@ AI assistance right in your terminal.
 - [x] Anthropic API integration
 - [x] Simple tool invocation framework
 - [x] Basic command popup
+- [x] External configuration file support
 - [ ] OpenAI API integration
 - [ ] OpenRouter API integration
 - [ ] Groq API integration
-- [ ] Config in external file
 - [ ] Customizable keybindings
 - [ ] More tools for AI interaction
 - [ ] Improved tool invocation framework
@@ -38,7 +39,7 @@ AI assistance right in your terminal.
 ## Requirements
 
 - Rust 2021 edition
-- Anthropic API key (set as `ANTHROPIC_API_KEY` environment variable)
+- Anthropic API key (set as `ANTHROPIC_API_KEY` environment variable or in config file)
 
 ## Installation
 
@@ -53,6 +54,32 @@ cargo build --release
 # Run the application
 cargo run --release
 ```
+
+## Configuration
+
+nixcode-ai can be configured using TOML configuration files. Configuration is read (if present) from:
+1. User-level config: `~/.config/nixcode/config.toml` (Unix) or `%APPDATA%\nixcode\config.toml` (Windows)
+2. Project-specific config: `.nixcode/config.toml` in the current project directory
+
+A sample configuration template is provided at `config.toml.example`. You can copy this to the appropriate location to customize your settings.
+
+Example configuration:
+```toml
+[llm]
+default_provider = "anthropic"
+
+[providers.anthropic]
+api_key = "${ANTHROPIC_API_KEY}"
+default_model = "claude-3-haiku"
+
+[providers.openai]
+api_key = "${OPENAI_API_KEY}"
+default_model = "gpt-4o-mini"
+```
+
+You can use `${ENV_VAR}` syntax to reference environment variables in configuration values.
+
+If no configuration file is found, sensible defaults will be used, and the application will look for API keys in environment variables.
 
 ## Project Structure
 
@@ -69,7 +96,7 @@ The project is organized as a Rust workspace with the following components:
 # Run with default settings
 cargo run --release
 
-# Make sure to set your Anthropic API key
+# Make sure to set your Anthropic API key (if not in config)
 export ANTHROPIC_API_KEY="your-api-key-here"
 ```
 
