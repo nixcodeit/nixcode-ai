@@ -45,7 +45,7 @@ AI assistance right in your terminal.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nixcode-ai.git
+git clone https://github.com/nixcodeit/nixcode-ai.git
 cd nixcode-ai
 
 # Build the project
@@ -58,12 +58,15 @@ cargo run --release
 ## Configuration
 
 nixcode-ai can be configured using TOML configuration files. Configuration is read (if present) from:
+
 1. User-level config: `~/.config/nixcode/config.toml` (Unix) or `%APPDATA%\nixcode\config.toml` (Windows)
 2. Project-specific config: `.nixcode/config.toml` in the current project directory
 
-A sample configuration template is provided at `config.toml.example`. You can copy this to the appropriate location to customize your settings.
+A sample configuration template is provided at `config.toml.example`. You can copy this to the appropriate location to
+customize your settings.
 
 Example configuration:
+
 ```toml
 [llm]
 default_provider = "anthropic"
@@ -79,7 +82,8 @@ default_model = "gpt-4o-mini"
 
 You can use `${ENV_VAR}` syntax to reference environment variables in configuration values.
 
-If no configuration file is found, sensible defaults will be used, and the application will look for API keys in environment variables.
+If no configuration file is found, sensible defaults will be used, and the application will look for API keys in
+environment variables.
 
 ## Project Structure
 
