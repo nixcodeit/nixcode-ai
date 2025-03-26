@@ -15,6 +15,12 @@ pub struct GlobToolParams {
     #[serde(default)]
     include_git: Option<bool>,
 
+    #[schemars(
+        description = "Include hidden (prefixed with `.`, like `.github`, `.nixcode` etc) (default: false)"
+    )]
+    #[serde(default)]
+    include_hidden: Option<bool>,
+
     #[schemars(description = "Offset for search results (default: 0)")]
     #[serde(default)]
     offset: Option<usize>,
@@ -37,22 +43,21 @@ pub async fn search_glob_files(params: GlobToolParams, project: &Project) -> ser
         return json!(pattern.unwrap_err().to_string());
     }
 
-    let offset = params.offset.unwrap_or(0);
     let pattern = pattern.unwrap();
 
-    // Using tokio's spawn_blocking for CPU-bound glob operation
     let pattern_str = pattern.to_str().unwrap().to_string();
     let glob_result = tokio::task::spawn_blocking(move || {
         glob(&pattern_str)
     }).await.unwrap();
 
+
     let mut result_str = String::new();
     let tool_result = match glob_result {
         Ok(paths) => {
+            let include_hidden = params.include_hidden.unwrap_or(false);
+            let offset = params.offset.unwrap_or(0);
             let include_git = params.include_git.unwrap_or(false);
-            let cwd = project.get_cwd().clone();
-            
-            // Collect paths in a blocking task since this might be CPU-intensive
+
             let paths = tokio::task::spawn_blocking(move || {
                 paths
                     .filter(Result::is_ok)
@@ -60,16 +65,11 @@ pub async fn search_glob_files(params: GlobToolParams, project: &Project) -> ser
                     .collect::<Vec<_>>()
             }).await.unwrap();
 
-            if paths.is_empty() {
-                return json!("No files found");
-            }
-
-            result_str.push_str("Glob results:\n");
             let cwd = project.get_cwd().clone();
             let paths = tokio::task::spawn_blocking(move || {
                 paths.iter().map(|path| {
                     let result = path.strip_prefix(&cwd);
-                    if result.is_err() {
+                    if let Err(_) = result {
                         return None;
                     }
 
@@ -78,16 +78,21 @@ pub async fn search_glob_files(params: GlobToolParams, project: &Project) -> ser
                 .filter(|path| path.is_some())
                 .map(|path| path.unwrap().to_string())
                 .filter(|path| {
-                    if !include_git && (path.starts_with(".git") || path.contains(".git/")) {
+                    if !include_git && path.contains(".git/") {
                         return false;
                     } else if include_git && path.starts_with(".git") {
                         return true;
                     }
 
-                    !(path.starts_with(".")
-                        || path.contains("/.")
-                        || path.starts_with("target/")
-                        || path.contains("node_modules/"))
+                    if !include_hidden && (path.starts_with(".") || path.contains("/.")) {
+                        return false;
+                    }
+
+                    if path.starts_with("target/") || path.contains("/target/") || path.contains("node_modules/") {
+                        return false;
+                    }
+
+                    return true;
                 }).collect::<Vec<_>>()
             }).await.unwrap();
 
@@ -95,6 +100,12 @@ pub async fn search_glob_files(params: GlobToolParams, project: &Project) -> ser
             paths.iter().skip(offset).take(100).for_each(|path| {
                 result_str.push_str(&format!("{}\n", path));
             });
+
+            if result_str.is_empty() {
+                return json!("No files found");
+            }
+
+            result_str.insert_str(0, "Glob results:\n");
 
             if missing_results > 0 {
                 if offset > 0 {
@@ -126,6 +137,7 @@ mod tests {
             pattern: "_not_existing_file.xyz.json".to_string(),
             include_git: None,
             offset: None,
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await;
@@ -140,6 +152,7 @@ mod tests {
             pattern: "Cargo.toml".to_string(),
             include_git: None,
             offset: None,
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await;
@@ -149,11 +162,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_ok_git_result() {
-        let project = Project::new(PathBuf::from(current_dir().unwrap()));
+        let project = Project::new(PathBuf::from(current_dir().unwrap().parent().unwrap().parent().unwrap()));
         let params = GlobToolParams {
-            pattern: "../../.git/*".to_string(),
+            pattern: ".git/*".to_string(),
             include_git: Some(true),
             offset: None,
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await.to_string();
@@ -162,12 +176,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_ok_hidden_result() {
+        let project = Project::new(PathBuf::from(current_dir().unwrap().parent().unwrap().parent().unwrap()));
+        let params = GlobToolParams {
+            pattern: ".github/*".to_string(),
+            include_git: None,
+            offset: None,
+            include_hidden: Some(true),
+        };
+
+        let result = search_glob_files(params, &project).await.to_string();
+        let expected = json!("No files found").to_string();
+        assert_ne!(result, expected);
+        assert!(result.contains(".github/ISSUE_TEMPLATE"));
+    }
+
+    #[tokio::test]
     async fn test_ok_not_git_result() {
-        let project = Project::new(PathBuf::from(current_dir().unwrap()));
+        let project = Project::new(PathBuf::from(current_dir().unwrap().parent().unwrap().parent().unwrap()));
         let params = GlobToolParams {
             pattern: ".git/*".to_string(),
             include_git: None,
             offset: None,
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await.to_string();
@@ -177,11 +208,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_many_files() {
-        let project = Project::new(PathBuf::from("/Users/nix/GIT/nixcode-ai"));
+        let project = Project::new(PathBuf::from(current_dir().unwrap().parent().unwrap().parent().unwrap()));
         let params = GlobToolParams {
             pattern: "**/*".to_string(),
             include_git: Some(true),
             offset: None,
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await.to_string();
@@ -191,15 +223,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_many_files_offset() {
-        let project = Project::new(PathBuf::from("/Users/nix/GIT/nixcode-ai"));
+        let project = Project::new(PathBuf::from(current_dir().unwrap().parent().unwrap().parent().unwrap()));
         let params = GlobToolParams {
             pattern: "**/*".to_string(),
             include_git: Some(true),
             offset: Some(100),
+            include_hidden: None,
         };
 
         let result = search_glob_files(params, &project).await.to_string();
 
-        assert!(result.to_string().contains("current offset: 100"));
+        assert!(result.contains("current offset: 100"));
     }
 }
