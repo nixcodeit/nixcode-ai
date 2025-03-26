@@ -1,8 +1,9 @@
-use std::path::PathBuf;
+use crate::project::Project;
+use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use nixcode_macros::tool;
-use crate::project::Project;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct CreateFileParams {
@@ -49,6 +50,13 @@ pub fn create_file(params: CreateFileParams, project: &Project) -> serde_json::V
     let path = path.unwrap();
     if !path.starts_with(cwd) {
         return serde_json::json!("Path must be inside project directory");
+    }
+
+    // create directories if they don't exist
+    let parent = path.parent().unwrap();
+    let create_dirs_result = std::fs::create_dir_all(parent);
+    if create_dirs_result.is_err() {
+        return serde_json::json!(create_dirs_result.unwrap_err().to_string());
     }
 
     let file = File::create(&path);
@@ -150,8 +158,8 @@ fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::fs::join_path;
     use super::*;
+    use crate::utils::fs::join_path;
 
     #[test]
     fn test_join_path() {
