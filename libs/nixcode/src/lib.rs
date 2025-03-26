@@ -12,7 +12,7 @@ use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
-use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request};
+use nixcode_llm_sdk::{LLMClient, MessageResponseStream, MessageResponseStreamEvent, Request, ThinkingOptions};
 use std::default::Default;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
@@ -62,9 +62,10 @@ impl Nixcode {
     pub async fn send(&self, messages: Vec<Message>) -> Result<MessageResponseStream, LLMError> {
         let mut request = Request::default()
             .with_model(self.model.clone())
-            .with_max_tokens(8192)
+            .with_max_tokens(51200)
             .with_messages(messages)
             .with_system_prompt(vec![Content::new_text(SYSTEM_PROMPT)])
+            .with_thinking(ThinkingOptions::new(8192))
             .with_cache();
 
         if !self.tools.is_empty() {

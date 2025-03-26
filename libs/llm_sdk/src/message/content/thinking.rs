@@ -8,6 +8,12 @@ pub struct ThinkingContent {
     signature: String,
 }
 
+impl ThinkingContent {
+    pub fn get_text(&self) -> String {
+        self.thinking.clone()
+    }
+}
+
 impl AddAssign<ContentThinkingDelta> for ThinkingContent {
     fn add_assign(&mut self, rhs: ContentThinkingDelta) {
         self.thinking += &rhs.thinking;

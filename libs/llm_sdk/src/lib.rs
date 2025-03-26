@@ -35,6 +35,15 @@ pub struct ThinkingOptions {
     budget_tokens: u32,
 }
 
+impl ThinkingOptions {
+    pub fn new(budget_tokens: u32) -> Self {
+        Self {
+            r#type: "enabled".into(),
+            budget_tokens,
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub enum ApiStandard {
     #[default]

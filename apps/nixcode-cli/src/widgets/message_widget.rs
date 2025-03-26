@@ -18,6 +18,12 @@ impl MessageWidget {
             .into_iter()
             .flat_map(|content| {
                 match content {
+                    Content::Thinking(content) => {
+                        vec![
+                            Line::from(vec![Span::raw("Thinking: "), Span::raw(content.get_text())]).italic(),
+                            Line::from(vec![]),
+                        ]
+                    }
                     Content::Text(text) => {
                         let mut lines: Vec<Line> = vec![];
                         let x: Vec<String> = text.get_text()
