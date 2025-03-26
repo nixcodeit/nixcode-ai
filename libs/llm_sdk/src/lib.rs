@@ -169,6 +169,22 @@ pub struct MessageDeltaEventContent {
     usage: UsageDelta,
 }
 
+impl MessageDeltaEventContent {
+    pub fn get_delta(&self) -> MessageDelta {
+        self.delta.clone()
+    }
+
+    pub fn get_usage(&self) -> UsageDelta {
+        self.usage.clone()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ErrorContent {
+    r#type: String,
+    message: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -180,7 +196,9 @@ pub enum MessageResponseStreamEvent {
     MessageDelta(MessageDeltaEventContent),
     MessageStop,
     Ping,
-    Error,
+    Error {
+        error: ErrorContent,
+    },
 }
 
 #[derive(Debug)]
@@ -467,14 +485,19 @@ impl LLMClientImpl for AnthropicClient {
                         let event = MessageResponseStreamEvent::try_from(event);
 
                         if let Err(err) = event {
-                            tx.send(MessageResponseStreamEvent::Error).ok();
+                            tx.send(MessageResponseStreamEvent::Error { error: err.into() }).ok();
                             continue;
                         }
 
                         tx.send(event.unwrap()).ok();
                     }
                     Err(e) => {
-                        tx.send(MessageResponseStreamEvent::Error).ok();
+                        tx.send(MessageResponseStreamEvent::Error {
+                            error: ErrorContent {
+                                r#type: "EventStreamError".into(),
+                                message: e.to_string(),
+                            }
+                        }).ok();
                     }
                 };
             }

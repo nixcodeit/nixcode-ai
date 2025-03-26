@@ -4,7 +4,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Margin, Rect};
 use ratatui::prelude::Widget;
-use ratatui::widgets::{Block, Clear};
+use ratatui::widgets::{Block, BorderType, Clear};
 
 pub struct CommandPopup {
     command: UserSingleLineInput,
@@ -58,7 +58,7 @@ impl Widget for &CommandPopup {
     where
         Self: Sized,
     {
-        let block = Block::bordered().title("Command");
+        let block = Block::bordered().title("Command").border_type(BorderType::Rounded);
         let input_area = CommandPopup::get_input_area(area);
 
         Clear.render(area, buf);

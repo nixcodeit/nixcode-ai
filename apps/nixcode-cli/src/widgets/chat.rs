@@ -14,11 +14,11 @@ use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::message::message::Message::{Assistant, User};
 use nixcode_llm_sdk::message::response::MessageResponse;
 use nixcode_llm_sdk::message::usage::Usage;
-use nixcode_llm_sdk::MessageResponseStreamEvent;
+use nixcode_llm_sdk::{ErrorContent, MessageResponseStreamEvent};
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
+use ratatui::widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
 use ratatui::Frame;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -40,6 +40,7 @@ pub struct Chat {
     stick_to_bottom: bool,
     scroll: usize, // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
+    llm_error: Option<ErrorContent>,
 
     usage: Usage,
 }
@@ -66,6 +67,7 @@ impl Chat {
             tools_to_execute: vec![],
             total_lines: 0,
             usage: Usage::default(),
+            llm_error: None,
         })
     }
 
@@ -118,8 +120,10 @@ impl Chat {
         match message {
             MessageResponseStreamEvent::MessageStart(msg) => {
                 *last_response += msg;
+                self.usage += last_response.usage.clone();
             },
             MessageResponseStreamEvent::MessageDelta(delta) => {
+                self.usage.output_tokens += delta.get_usage().output_tokens;
                 *last_response += delta;
             },
             MessageResponseStreamEvent::ContentBlockStart(content) => {
@@ -134,8 +138,10 @@ impl Chat {
                 }
             },
             MessageResponseStreamEvent::MessageStop => {
-                self.usage += last_response.usage.clone();
                 self.app_event.send(AppEvent::ExecuteTools).ok();
+            }
+            MessageResponseStreamEvent::Error { error } => {
+                self.llm_error = Some(error.clone());
             }
             _ => (),
         }
@@ -146,11 +152,15 @@ impl Chat {
     }
 
     fn update_chat_widgets(&mut self) {
-        let lines: Vec<Line> = self.messages
+        let mut lines: Vec<Line> = self.messages
             .clone()
             .into_iter()
             .flat_map(MessageWidget::get_lines)
             .collect();
+
+        if let Some(error) = &self.llm_error {
+            lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
+        }
 
         self.paragraph = Paragraph::new(lines.clone())
             .wrap(Wrap { trim: true });
@@ -179,8 +189,8 @@ impl Chat {
 
     pub fn handle_llm_error(&mut self, error: LLMError) {
         self.waiting = false;
-        self.last_message_response = None;
-        eprintln!("{:?}", error);
+        self.llm_error = Some(error.into());
+        self.update_chat_widgets();
     }
 
     // Simplified to use a single scroll value
@@ -259,6 +269,7 @@ impl Chat {
     }
 
     async fn send_message(&mut self, message: Option<Message>) {
+        self.llm_error = None;
         if let Some(message) = message {
             self.add_message(message);
         }
@@ -311,6 +322,7 @@ impl Chat {
 
     pub fn generated_response(&mut self) {
         self.waiting = false;
+        self.update_chat_widgets();
     }
 
     fn get_layout(&self, area: Rect) -> [Rect; 3] {
@@ -335,8 +347,16 @@ impl Chat {
         let input_cost = self.usage.input_tokens as f64 / 1_000_000.0 * 3.0;
         let output_cost = self.usage.output_tokens as f64 / 1_000_000.0 * 15.0;
         let total_cost = create_input_cache_cost + read_input_cache_cost + input_cost + output_cost;
-        let mut main_area = Block::bordered().title("Chat")
-            .title_bottom(Line::raw(format!(" Cost: ${:.4} ", total_cost)).right_aligned());
+
+        let cache_write_tokens = self.usage.cache_creation_input_tokens.unwrap_or(0);
+        let cache_read_tokens = self.usage.cache_read_input_tokens.unwrap_or(0);
+        let input_tokens = self.usage.input_tokens;
+        let output_tokens = self.usage.output_tokens;
+
+        let mut main_area = Block::bordered().title(" Chat ")
+            .border_type(BorderType::Rounded)
+            .title_bottom(Line::raw(format!(" ${:.4} ", total_cost)).right_aligned())
+            .title_bottom(Line::raw(format!(" Cache (R/W): ({}, {}), Input: {}, Output: {} ", cache_read_tokens, cache_write_tokens, input_tokens, output_tokens)).centered());
 
         if self.waiting {
             main_area = main_area.title_bottom(
@@ -364,7 +384,7 @@ impl Chat {
 
         self.render_chat(frame, chat_area);
 
-        frame.render_widget(Block::bordered().title("Input"), input_area);
+        frame.render_widget(Block::bordered().title(" Input ").border_type(BorderType::Rounded), input_area);
         frame.render_widget(&self.prompt, input_inner_area);
     }
 
@@ -440,8 +460,27 @@ impl Chat {
         self.usage = Usage::default();
     }
 
+    /// Retry last message that was sent by the user
     pub async fn retry_last_message(&mut self) {
-        if self.messages.len() == 0 || self.waiting {
+        if self.waiting {
+            return;
+        }
+
+        loop {
+            let last_message = self.messages.last();
+            if last_message.is_none() {
+                break;
+            }
+
+            if let Assistant(_) = last_message.unwrap() {
+                self.messages.pop();
+                continue;
+            }
+
+            break;
+        }
+
+        if self.messages.len() == 0 {
             return;
         }
 

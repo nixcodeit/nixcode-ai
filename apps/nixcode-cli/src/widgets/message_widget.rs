@@ -1,8 +1,8 @@
+use nixcode_llm_sdk::message::content::tools::ToolUseState;
+use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use ratatui::prelude::*;
-use ratatui::text::{Line};
-use nixcode_llm_sdk::message::content::Content;
-use nixcode_llm_sdk::message::content::tools::ToolUseState;
+use ratatui::text::Line;
 
 pub struct MessageWidget {}
 
@@ -40,37 +40,40 @@ impl MessageWidget {
                             lines.push(Line::from(x[i].clone()));
                         }
 
+                        lines.push(Line::from(vec![]));
+
                         lines
                     },
                     Content::ToolUse(tool_use) => {
-                        vec![match tool_use.get_state() {
-                            ToolUseState::Created => Line::from(format!("[{}] waiting", tool_use.get_tool_name())).bold(),
-                            ToolUseState::Executing => Line::from(format!("[{}] executing", tool_use.get_tool_name())).bold(),
-                            ToolUseState::Executed => Line::from(format!("[{}] finished", tool_use.get_tool_name())).bold(),
-                            ToolUseState::Error => Line::from(format!("[{}] failed", tool_use.get_tool_name())).bold(),
-                        }]
+                        vec![
+                            match tool_use.get_state() {
+                                ToolUseState::Created => Line::from(format!("[{}] waiting", tool_use.get_tool_name())).bold(),
+                                ToolUseState::Executing => Line::from(format!("[{}] executing", tool_use.get_tool_name())).bold(),
+                                ToolUseState::Executed => Line::from(format!("[{}] finished", tool_use.get_tool_name())).bold(),
+                                ToolUseState::Error => Line::from(format!("[{}] failed", tool_use.get_tool_name())).bold(),
+                            },
+                            Line::from(vec![]),
+                        ]
                     }
                     Content::ToolResult(tool_result) => {
                         let content = tool_result.get_content();
                         let split_iterator = content.split("\n");
                         let total_lines = split_iterator.clone().count();
                         let str_lines = split_iterator.take(5).map(|x| x.to_string()).collect::<Vec<String>>();
-                        let mut lines = vec![];
+                        let mut lines = vec![
+                            Line::from(Span::raw(format!("[{}] ", tool_result.get_tool_use_id()))),
+                        ];
 
                         for i in 0..str_lines.len() {
-                            if i == 0 {
-                                lines.push(
-                                    Line::from(vec![Span::raw(format!("[{}] ", tool_result.get_tool_use_id())), Span::raw(str_lines[i].clone())]).italic()
-                                );
-                                continue;
-                            }
-
                             lines.push(Line::from(str_lines[i].clone()).italic());
                         }
+
                         let missing_lines = total_lines.saturating_sub(5);
                         if missing_lines > 0 {
                             lines.push(Line::from(format!("... {} more lines", missing_lines)).italic());
                         }
+
+                        lines.push(Line::from(vec![]));
 
                         lines
                     }
