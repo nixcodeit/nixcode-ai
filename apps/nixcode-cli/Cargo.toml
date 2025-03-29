@@ -18,3 +18,4 @@ rustyline = "15.0.0"     # For handling input with history
 colored = "3.0.0"        # For colorful output
 nixcode_llm_sdk = { path = '../../libs/llm_sdk' }
 unicode-width = "0.1.11" # For correct handling of character widths in terminal
+openssl-sys = { version = "0.9", features = ["vendored"] }
