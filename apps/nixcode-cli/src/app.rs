@@ -206,9 +206,12 @@ impl App {
     async fn execute_command(&mut self, command: String) {
         let command = command.trim();
         match command {
-            "exit" | "quit" | "q" => self.quit(),
+            "quit" => self.quit(),
             "clear" => { self.tx.send(AppEvent::ClearChat).ok(); },
             "retry" => { self.tx.send(AppEvent::RetryLastMessage).ok(); },
+            "settings" => self.show_settings(),
+            "chat" => self.show_chat_view(),
+            "help" => self.show_help(),
             _ => (),
         }
 
@@ -225,5 +228,10 @@ impl App {
 
     fn show_chat_view(&mut self) {
         self.current_view = AppView::Chat;
+    }
+
+    fn show_help(&mut self) {
+        // A placeholder for future help implementation
+        // For now, we'll just return to normal mode
     }
 }
