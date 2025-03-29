@@ -180,6 +180,7 @@ mod tests {
         assert_eq!(result, PathBuf::from("foo.txt"));
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_join_path_absolute() {
         let base = PathBuf::from("tmp");
@@ -190,9 +191,32 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_join_path_absolute() {
+        let base = PathBuf::from("tmp");
+        let path = PathBuf::from("C:\\foo.txt");
+
+        let result = join_path(base, path);
+
+        assert!(result.is_err());
+    }
+
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_join_path_multiple_relatives() {
         let base = PathBuf::from("/tmp");
+        let path = PathBuf::from("./../../../../foo.txt");
+
+        let result = join_path(base, path);
+
+        assert!(result.is_err());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_join_path_multiple_relatives() {
+        let base = PathBuf::from("C:\\tmp");
         let path = PathBuf::from("./../../../../foo.txt");
 
         let result = join_path(base, path);
