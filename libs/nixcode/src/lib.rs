@@ -22,7 +22,7 @@ use std::default::Default;
 use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
-use tools::git::{GitAddTool, GitCommitTool, GitStatusTool};
+use tools::git::{GitAddTool, GitCommitTool, GitDiffTool, GitStatusTool};
 
 pub struct Nixcode {
     project: Arc<Project>,
@@ -59,6 +59,7 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitAddTool {}));
                     tools.add_tool(Arc::new(GitCommitTool {}));
                     tools.add_tool(Arc::new(GitStatusTool {}));
+                    tools.add_tool(Arc::new(GitDiffTool {}));
                 }
 
                 if !has_init_analysis {
