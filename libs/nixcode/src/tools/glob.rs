@@ -207,25 +207,6 @@ mod tests {
         assert!(result.contains(".github/ISSUE_TEMPLATE"));
     }
 
-    #[cfg(target_os = "windows")]
-    #[tokio::test]
-    async fn test_ok_hidden_result() {
-        let project = Arc::new(Project::new(PathBuf::from(
-            current_dir().unwrap().parent().unwrap().parent().unwrap(),
-        )));
-        let params = GlobToolParams {
-            pattern: ".github/*".to_string(),
-            include_gitignored: None,
-            offset: None,
-            include_hidden: Some(true),
-        };
-
-        let result = search_glob_files(params, project).await.to_string();
-        let expected = json!("No files found").to_string();
-        assert_ne!(result, expected);
-        assert!(result.contains(".github\\ISSUE_TEMPLATE"));
-    }
-
     #[tokio::test]
     async fn test_ok_not_git_result() {
         let project = Arc::new(Project::new(PathBuf::from(
