@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::sync::{Arc};
 use crate::project::Project;
 use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub mod glob;
 pub mod fs;
@@ -11,7 +11,7 @@ pub mod prompt;
 pub trait Tool {
     fn get_name(&self) -> String;
     fn get_schema(&self) -> nixcode_llm_sdk::tools::Tool;
-    async fn execute(&self, params: serde_json::Value, project: &Project) -> anyhow::Result<serde_json::Value>;
+    async fn execute(&self, params: serde_json::Value, project: Arc<Project>) -> anyhow::Result<serde_json::Value>;
 }
 
 pub type SafeTool = Arc<dyn Tool + Send + Sync>;
@@ -44,7 +44,7 @@ impl Tools {
         self.hashmap.values().map(|tool| tool.get_schema()).collect()
     }
 
-    pub async fn execute_tool(&self, name: &str, params: serde_json::Value, project: &Project) -> anyhow::Result<serde_json::Value> {
+    pub async fn execute_tool(&self, name: &str, params: serde_json::Value, project: Arc<Project>) -> anyhow::Result<serde_json::Value> {
         if let Some(tool) = self.get_tool(name) {
             tool.execute(params, project).await
         } else {

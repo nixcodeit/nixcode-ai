@@ -1,9 +1,11 @@
+use git2::Repository;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Project {
     cwd: PathBuf,
     project_init_analysis_content: Option<String>,
+    repo_path: Option<PathBuf>,
 }
 
 impl Project {
@@ -12,10 +14,22 @@ impl Project {
         let mut project_init_analysis_content = None;
         if let Ok(exists) = std::fs::exists(init_analysis_path.as_path()) {
             if exists {
-                project_init_analysis_content = Some(std::fs::read_to_string(init_analysis_path).unwrap());
+                project_init_analysis_content =
+                    Some(std::fs::read_to_string(init_analysis_path).unwrap());
             }
         }
-        Self { cwd, project_init_analysis_content }
+
+        let repository = if let Some(repository) = Repository::discover(cwd.as_path()).ok() {
+            repository.workdir().map(|path| path.into())
+        } else {
+            None
+        };
+
+        Self {
+            cwd,
+            project_init_analysis_content,
+            repo_path: repository,
+        }
     }
 
     pub fn get_cwd(&self) -> PathBuf {
@@ -28,5 +42,13 @@ impl Project {
 
     pub fn has_init_analysis(&self) -> bool {
         self.project_init_analysis_content.is_some()
+    }
+
+    pub fn has_repo_path(&self) -> bool {
+        self.repo_path.is_some()
+    }
+
+    pub fn get_repo_path(&self) -> Option<PathBuf> {
+        self.repo_path.clone()
     }
 }

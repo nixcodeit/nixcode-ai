@@ -2,6 +2,7 @@ use crate::project::Project;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct ProjectAnalysisPromptParams {
@@ -11,7 +12,7 @@ pub struct ProjectAnalysisPromptParams {
 }
 
 #[tool("Generate a project analysis prompt for LLM to understand codebase structure and architecture")]
-pub async fn get_project_analysis_prompt(params: ProjectAnalysisPromptParams, _project: &Project) -> serde_json::Value {
+pub async fn get_project_analysis_prompt(params: ProjectAnalysisPromptParams, _project: Arc<Project>) -> serde_json::Value {
     let focus = params.focus.unwrap_or_default();
     
     let mut prompt = String::from(
@@ -77,12 +78,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_project_analysis_prompt() {
-        let project = Project::new(PathBuf::from("/tmp"));
+        let project = Arc::new(Project::new(PathBuf::from("/tmp")));
         let params = ProjectAnalysisPromptParams {
             focus: None,
         };
 
-        let result = get_project_analysis_prompt(params, &project).await;
+        let result = get_project_analysis_prompt(params, project).await;
         assert!(result.is_string());
         let prompt = result.as_str().unwrap();
         assert!(prompt.contains("Project Analysis Task"));
@@ -91,12 +92,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_project_analysis_prompt_with_focus() {
-        let project = Project::new(PathBuf::from("/tmp"));
+        let project = Arc::new(Project::new(PathBuf::from("/tmp")));
         let params = ProjectAnalysisPromptParams {
             focus: Some("architecture".to_string()),
         };
 
-        let result = get_project_analysis_prompt(params, &project).await;
+        let result = get_project_analysis_prompt(params, project).await;
         assert!(result.is_string());
         let prompt = result.as_str().unwrap();
         assert!(prompt.contains("Special Focus Area: architecture"));

@@ -3,6 +3,7 @@ use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct CreateFileParams {
@@ -33,7 +34,7 @@ pub struct DeleteFileParams {
 }
 
 #[tool("Create empty file in given path")]
-pub async fn create_file(params: CreateFileParams, project: &Project) -> serde_json::Value {
+pub async fn create_file(params: CreateFileParams, project: std::sync::Arc<Project>) -> serde_json::Value {
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
     use crate::utils::fs;
@@ -70,7 +71,7 @@ pub async fn create_file(params: CreateFileParams, project: &Project) -> serde_j
 }
 
 #[tool("Read file content")]
-pub async fn read_text_file(params: ReadTextFileParams, project: &Project) -> serde_json::Value {
+pub async fn read_text_file(params: ReadTextFileParams, project: Arc<Project>) -> serde_json::Value {
     use tokio::fs::read_to_string;
     use crate::utils::fs;
 
@@ -98,7 +99,7 @@ pub async fn read_text_file(params: ReadTextFileParams, project: &Project) -> se
 }
 
 #[tool("Update file content")]
-pub async fn update_text_file(params: UpdateTextFileParams, project: &Project) -> serde_json::Value {
+pub async fn update_text_file(params: UpdateTextFileParams, project: Arc<Project>) -> serde_json::Value {
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
     use crate::utils::fs;
@@ -128,7 +129,7 @@ pub async fn update_text_file(params: UpdateTextFileParams, project: &Project) -
 }
 
 #[tool("Delete file")]
-pub async fn delete_file(params: DeleteFileParams, project: &Project) -> serde_json::Value {
+pub async fn delete_file(params: DeleteFileParams, project: Arc<Project>) -> serde_json::Value {
     use tokio::fs::remove_file;
     use crate::utils::fs;
 
@@ -192,24 +193,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_create_file() {
-        let project = Project::new(PathBuf::from("/tmp"));
+        let project = Arc::new(Project::new(PathBuf::from("/tmp")));
         let params = CreateFileParams {
             path: String::from("./../foo.txt"),
         };
 
-        let result = create_file(params, &project).await;
+        let result = create_file(params, project).await;
 
         assert_eq!(result, serde_json::json!("Path must be inside project directory"));
     }
 
     #[tokio::test]
     async fn test_create_file() {
-        let project = Project::new(PathBuf::from("/tmp"));
+        let project = Arc::new(Project::new(PathBuf::from("/tmp")));
         let params = CreateFileParams {
             path: String::from("foo.txt"),
         };
 
-        let result = create_file(params, &project).await;
+        let result = create_file(params, project).await;
 
         assert_eq!(result, serde_json::json!("File created"));
     }

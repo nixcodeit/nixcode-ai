@@ -70,22 +70,11 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
                 nixcode_llm_sdk::tools::Tool::new(tool_name, description, parameters)
             }
 
-            async fn execute(&self, params: serde_json::Value, project: &crate::project::Project) -> anyhow::Result<serde_json::Value> {
+            async fn execute(&self, params: serde_json::Value, project: std::sync::Arc<crate::project::Project>) -> anyhow::Result<serde_json::Value> {
                 let params: #param_ident = serde_json::from_value(params)?;
                 Ok(#func_name(params, project).await)
             }
         }
-    };
-
-    expanded.into()
-}
-
-#[proc_macro_attribute]
-pub fn struct_tool(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let func = parse_macro_input!(input as ItemFn);
-    dbg!(&func);
-    let expanded = quote! {
-        #func
     };
 
     expanded.into()

@@ -15,7 +15,9 @@ use nixcode_llm_sdk::{ErrorContent, MessageResponseStreamEvent};
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap};
+use ratatui::widgets::{
+    Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+};
 use ratatui::Frame;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -35,14 +37,18 @@ pub struct Chat {
     waiting: bool,
     area_size: (u16, u16), // (width, height)
     stick_to_bottom: bool,
-    scroll: usize, // Simplified to a single value for vertical scrolling
+    scroll: usize,      // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
     llm_error: Option<ErrorContent>,
     usage: Usage,
 }
 
 impl Chat {
-    pub fn new(client: Arc<Nixcode>, input_mode: InputMode, app_event: UnboundedSender<AppEvent>) -> Self {
+    pub fn new(
+        client: Arc<Nixcode>,
+        input_mode: InputMode,
+        app_event: UnboundedSender<AppEvent>,
+    ) -> Self {
         Chat {
             vertical_scroll_state: ScrollbarState::default(),
             client,
@@ -115,22 +121,24 @@ impl Chat {
             MessageResponseStreamEvent::MessageStart(msg) => {
                 *last_response += msg;
                 self.usage += last_response.usage.clone();
-            },
+            }
             MessageResponseStreamEvent::MessageDelta(delta) => {
                 self.usage.output_tokens += delta.get_usage().output_tokens;
                 *last_response += delta;
-            },
+            }
             MessageResponseStreamEvent::ContentBlockStart(content) => {
                 *last_response += content;
-            },
+            }
             MessageResponseStreamEvent::ContentBlockDelta(delta) => {
                 *last_response += delta;
-            },
+            }
             MessageResponseStreamEvent::ContentBlockStop(content) => {
                 if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
-                    self.app_event.send(AppEvent::ToolAddToExecute(tool_use)).ok();
+                    self.app_event
+                        .send(AppEvent::ToolAddToExecute(tool_use))
+                        .ok();
                 }
-            },
+            }
             MessageResponseStreamEvent::MessageStop => {
                 self.app_event.send(AppEvent::ExecuteTools).ok();
             }
@@ -146,7 +154,8 @@ impl Chat {
     }
 
     fn update_chat_widgets(&mut self) {
-        let mut lines: Vec<Line> = self.messages
+        let mut lines: Vec<Line> = self
+            .messages
             .clone()
             .into_iter()
             .flat_map(MessageWidget::get_lines)
@@ -156,8 +165,7 @@ impl Chat {
             lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
         }
 
-        self.paragraph = Paragraph::new(lines.clone())
-            .wrap(Wrap { trim: true });
+        self.paragraph = Paragraph::new(lines.clone()).wrap(Wrap { trim: true });
 
         // Calculate the total line count based on the content and area width
         let total_lines = if self.area_size.0 > 0 {
@@ -171,7 +179,8 @@ impl Chat {
         self.lines = lines;
 
         // Update scrollbar state with new content length
-        self.vertical_scroll_state = self.vertical_scroll_state
+        self.vertical_scroll_state = self
+            .vertical_scroll_state
             .content_length(self.total_lines.saturating_sub(self.area_size.1 as usize))
             .viewport_content_length(self.area_size.1 as usize);
 
@@ -244,7 +253,8 @@ impl Chat {
             self.update_chat_widgets();
         } else {
             // Just update the scrollbar viewport height
-            self.vertical_scroll_state = self.vertical_scroll_state
+            self.vertical_scroll_state = self
+                .vertical_scroll_state
                 .viewport_content_length(size.1 as usize);
 
             // Check if we need to adjust scroll position
@@ -340,8 +350,10 @@ impl Chat {
         let inner = area.inner(Margin::new(1, 1));
         self.set_area_size((inner.width, inner.height));
 
-        let create_input_cache_cost = self.usage.cache_creation_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 3.75;
-        let read_input_cache_cost = self.usage.cache_read_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 0.30;
+        let create_input_cache_cost =
+            self.usage.cache_creation_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 3.75;
+        let read_input_cache_cost =
+            self.usage.cache_read_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 0.30;
         let input_cost = self.usage.input_tokens as f64 / 1_000_000.0 * 3.0;
         let output_cost = self.usage.output_tokens as f64 / 1_000_000.0 * 15.0;
         let total_cost = create_input_cache_cost + read_input_cache_cost + input_cost + output_cost;
@@ -355,26 +367,39 @@ impl Chat {
         let provider = &self.client.get_config().llm.default_provider;
         let model = &self.client.get_model();
 
+        let mut title_line_spans = vec![Span::from(format!(" Chat [{}/{}]", provider, model))];
+
+        if self.client.get_project().has_repo_path() {
+            title_line_spans.push(Span::styled(" [git] ", Style::new().green().bold()))
+        } else {
+            title_line_spans.push(Span::styled(" [git] ", Style::new().red()))
+        }
+
         let mut main_area = Block::bordered()
-            .title(format!(" Chat [{}/{}] ", provider, model))
+            .title(Line::from(title_line_spans))
             .border_type(BorderType::Rounded)
             .title_bottom(Line::raw(format!(" ${:.4} ", total_cost)).right_aligned())
-            .title_bottom(Line::raw(format!(" Cache (R/W): ({}, {}), Input: {}, Output: {} ", cache_read_tokens, cache_write_tokens, input_tokens, output_tokens)).centered());
-
+            .title_bottom(
+                Line::raw(format!(
+                    " Cache (R/W): ({}, {}), Input: {}, Output: {} ",
+                    cache_read_tokens, cache_write_tokens, input_tokens, output_tokens
+                ))
+                .centered(),
+            );
 
         if !self.client.has_init_analysis() {
             main_area = main_area.title(
                 Line::from(" Project analysis not initialized ")
                     .red()
                     .bold()
-                    .right_aligned()
+                    .right_aligned(),
             );
         } else {
             main_area = main_area.title(
                 Line::from(" Project analysis initialized ")
                     .green()
                     .bold()
-                    .right_aligned()
+                    .right_aligned(),
             );
         }
 
@@ -382,7 +407,7 @@ impl Chat {
             main_area = main_area.title_bottom(
                 Span::styled(" Waiting for response ", Style::new().bold().italic())
                     .add_modifier(Modifier::SLOW_BLINK)
-                    .add_modifier(Modifier::DIM)
+                    .add_modifier(Modifier::DIM),
             );
         }
 
@@ -395,7 +420,7 @@ impl Chat {
         // Apply the scroll to the paragraph
         let scrolled_paragraph = self.paragraph.clone().scroll((self.scroll as u16, 0));
         frame.render_widget(scrolled_paragraph, inner);
-        
+
         frame.render_stateful_widget(scroll, inner, &mut self.vertical_scroll_state);
     }
 
@@ -404,7 +429,12 @@ impl Chat {
 
         self.render_chat(frame, chat_area);
 
-        frame.render_widget(Block::bordered().title(" Input ").border_type(BorderType::Rounded), input_area);
+        frame.render_widget(
+            Block::bordered()
+                .title(" Input ")
+                .border_type(BorderType::Rounded),
+            input_area,
+        );
         frame.render_widget(&self.prompt, input_inner_area);
     }
 

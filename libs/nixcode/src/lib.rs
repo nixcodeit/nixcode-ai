@@ -1,8 +1,8 @@
-mod tools;
-pub mod project;
-mod utils;
-mod prompts;
 pub mod config;
+pub mod project;
+mod prompts;
+mod tools;
+mod utils;
 
 use crate::config::Config;
 use crate::project::Project;
@@ -24,7 +24,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
 
 pub struct Nixcode {
-    project: Project,
+    project: Arc<Project>,
     client: LLMClient,
     model: String,
     tools: Tools,
@@ -32,12 +32,16 @@ pub struct Nixcode {
 }
 
 impl Nixcode {
-    pub fn new(project: Project, client: LLMClient, config: Config) -> anyhow::Result<Self, LLMError> {
+    pub fn new(
+        project: Project,
+        client: LLMClient,
+        config: Config,
+    ) -> anyhow::Result<Self, LLMError> {
         let has_init_analysis = project.has_init_analysis();
         let model = config.get_model_for_provider(&config.llm.default_provider);
 
         Ok(Self {
-            project,
+            project: Arc::new(project),
             client,
             model,
             config,
@@ -79,17 +83,16 @@ impl Nixcode {
                 let llm_config = LLMConfig { api_key };
                 let client = LLMClient::new_anthropic(llm_config)?;
                 Self::new(project, client, config)
-            },
+            }
             // OpenAI with available API key
             ("openai", Ok(api_key)) => {
                 let llm_config = LLMConfig { api_key };
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
-            },
+            }
             // Fallback to environment variables for Anthropic
             (_, _) => {
-                let api_key = env::var("ANTHROPIC_API_KEY")
-                    .map_err(|_| LLMError::MissingAPIKey)?;
+                let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LLMError::MissingAPIKey)?;
 
                 let llm_config = LLMConfig {
                     api_key: SecretString::new(api_key.into()),
@@ -155,8 +158,10 @@ impl Nixcode {
         &self,
         name: &str,
         params: serde_json::Value,
-    ) -> anyhow::Result<serde_json::Value> {
-        self.tools.execute_tool(name, params, &self.project).await
+    ) -> Result<serde_json::Value> {
+        self.tools
+            .execute_tool(name, params, self.project.clone())
+            .await
     }
 
     pub fn has_init_analysis(&self) -> bool {
@@ -169,5 +174,9 @@ impl Nixcode {
 
     pub fn get_model(&self) -> &str {
         &self.model
+    }
+
+    pub fn get_project(&self) -> Arc<Project> {
+        self.project.clone()
     }
 }
