@@ -1,5 +1,5 @@
 use core::str;
-use std::{any::Any, borrow::BorrowMut, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use git2::{DiffOptions, Status, SubmoduleIgnore};
 use nixcode_macros::tool;
@@ -158,7 +158,7 @@ pub async fn git_status(_: GitGetTreeProps, project: Arc<Project>) -> serde_json
                 _ => ' ',
             };
 
-            let mut wstatus = match status {
+            let wstatus = match status {
                 s if s.contains(git2::Status::WT_NEW) => {
                     if istatus == ' ' {
                         istatus = '?';
