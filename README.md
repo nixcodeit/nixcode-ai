@@ -113,9 +113,34 @@ The application uses vim-inspired input modes:
 
 ## Tools
 
-nixcode-ai includes a tool framework that allows the LLM to invoke functions. Currently implemented tools:
+nixcode-ai includes a tool framework that allows the LLM to invoke functions. The tools provide capabilities for the LLM to interact with the local filesystem, search for files, work with Git repositories, and more.
 
-- File globbing: Search for files matching patterns
+### File System Tools
+- **create_file**: Create an empty file at a specified path
+- **read_text_file**: Read the content of a text file
+- **update_text_file**: Update the content of a text file
+- **delete_file**: Delete a file at a specified path
+
+### Git Tools
+- **git_add**: Track changes in git by adding files to the index
+- **git_commit**: Commit tracked changes with a message
+- **git_status**: Get the current git repository status
+- **git_diff**: Get the diff for a specific file
+
+### Search Tools
+- **search_glob_files**: Search for files in the project directory using glob patterns, with options to include gitignored and hidden files
+
+### Project Analysis Tools
+- **get_project_analysis_prompt**: Generate a comprehensive project analysis prompt for better understanding of the codebase
+
+These tools enable powerful use cases such as:
+- Code exploration and navigation
+- File content analysis and modification
+- Code generation and saving to files
+- Version control operations
+- Project structure understanding
+
+The tool system is designed to be extensible, making it easy to add new capabilities for the LLM to leverage.
 
 ## License
 
