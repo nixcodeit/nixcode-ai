@@ -22,6 +22,7 @@ use std::default::Default;
 use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
+use tools::git::{GitAddTool, GitCommitTool, GitStatusTool};
 
 pub struct Nixcode {
     project: Arc<Project>,
@@ -39,6 +40,7 @@ impl Nixcode {
     ) -> anyhow::Result<Self, LLMError> {
         let has_init_analysis = project.has_init_analysis();
         let model = config.get_model_for_provider(&config.llm.default_provider);
+        let has_repo_path = project.has_repo_path();
 
         Ok(Self {
             project: Arc::new(project),
@@ -53,6 +55,11 @@ impl Nixcode {
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
                 tools.add_tool(Arc::new(UpdateTextFileTool {}));
                 tools.add_tool(Arc::new(DeleteFileTool {}));
+                if has_repo_path {
+                    tools.add_tool(Arc::new(GitAddTool {}));
+                    tools.add_tool(Arc::new(GitCommitTool {}));
+                    tools.add_tool(Arc::new(GitStatusTool {}));
+                }
 
                 if !has_init_analysis {
                     tools.add_tool(Arc::new(GetProjectAnalysisPromptTool {}));

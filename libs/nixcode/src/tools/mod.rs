@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub mod fs;
+pub mod git;
 pub mod glob;
 pub mod prompt;
 
