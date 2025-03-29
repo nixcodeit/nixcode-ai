@@ -55,6 +55,16 @@ impl Content {
             tool_use.set_state(state);
         }
     }
+
+    pub fn validate_content(&self) -> bool {
+        match self {
+            Content::Text(text) => text.validate_content(),
+            Content::Thinking(thinking) => thinking.validate_content(),
+            Content::ToolUse(tool_use) => tool_use.validate_content(),
+            Content::ToolResult(tool_result) => tool_result.validate_content(),
+            _ => true,
+        }
+    }
 }
 
 impl Content {

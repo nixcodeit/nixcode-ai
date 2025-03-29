@@ -12,6 +12,10 @@ impl ThinkingContent {
     pub fn get_text(&self) -> String {
         self.thinking.clone()
     }
+
+    pub fn validate_content(&self) -> bool {
+        !self.thinking.is_empty()
+    }
 }
 
 impl AddAssign<ContentThinkingDelta> for ThinkingContent {

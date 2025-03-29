@@ -26,6 +26,7 @@ pub enum AppEvent {
     ToolStart(ToolUseContent),
     ToolEnd(ToolResultContent),
     RetryLastMessage,
+    RemoveLastMessage,
     ClearChat,
     Quit,
     Render,
@@ -161,6 +162,7 @@ impl App {
             AppEvent::Render => (),
             AppEvent::RetryLastMessage => self.chat_view.retry_last_message().await,
             AppEvent::ClearChat => self.chat_view.clear_chat(),
+            AppEvent::RemoveLastMessage => self.chat_view.remove_last_message(),
         }
     }
 
@@ -209,10 +211,8 @@ impl App {
             "quit" => self.quit(),
             "clear" => { self.tx.send(AppEvent::ClearChat).ok(); },
             "retry" => { self.tx.send(AppEvent::RetryLastMessage).ok(); },
-            "settings" => self.show_settings(),
-            "chat" => self.show_chat_view(),
-            "help" => self.show_help(),
-            _ => (),
+            "remove-last-message" => self.chat_view.remove_last_message(),
+            _ => panic!("Command not implemented: {}", command),
         }
 
         self.set_input_mode(InputMode::Normal);

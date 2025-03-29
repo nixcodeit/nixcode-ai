@@ -61,6 +61,10 @@ impl ToolUseContent {
     pub(crate) fn set_state(&mut self, state: ToolUseState) {
         self._tool_execution_state = state;
     }
+
+    pub fn validate_content(&self) -> bool {
+        !self.input.is_null()
+    }
 }
 
 impl AddAssign<ContentInputJsonDelta> for ToolUseContent {
@@ -88,6 +92,10 @@ impl ToolResultContent {
 
     pub fn get_content(&self) -> String {
         self.content.clone()
+    }
+
+    pub fn validate_content(&self) -> bool {
+        !self.content.is_empty()
     }
 }
 

@@ -32,19 +32,9 @@ const AVAILABLE_COMMANDS: &[CommandInfo] = &[
         description: "Retry the last message",
     },
     CommandInfo {
-        name: "settings",
-        aliases: &[],
-        description: "Show settings view",
-    },
-    CommandInfo {
-        name: "chat",
-        aliases: &[],
-        description: "Return to chat view",
-    },
-    CommandInfo {
-        name: "help",
-        aliases: &["?"],
-        description: "Show help information",
+        name: "remove-last-message",
+        aliases: &["remove-last", "remove-last-msg", "remove-msg", "rlm"],
+        description: "Remove the last message from the chat",
     },
 ];
 

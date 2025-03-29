@@ -9,11 +9,15 @@ pub struct TextContent {
 
 impl TextContent {
     pub fn new(text: String) -> Self {
-        Self { text }
+        Self { text: text.trim().to_string() }
     }
 
     pub fn get_text(&self) -> String {
         self.text.clone()
+    }
+
+    pub fn validate_content(&self) -> bool {
+        !self.text.is_empty()
     }
 }
 

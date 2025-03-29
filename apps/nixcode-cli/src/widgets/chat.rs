@@ -297,7 +297,11 @@ impl Chat {
             return;
         }
 
-        let message = self.prompt.as_string();
+        let message = self.prompt.as_string().trim().to_string();
+        if message.is_empty() {
+            return;
+        }
+
         let message = User(Content::new_text(message).into());
         self.prompt.flush();
 
@@ -458,6 +462,23 @@ impl Chat {
         let message = User(Content::new_tool_results(contents));
 
         self.send_message(Some(message)).await;
+    }
+
+    pub fn remove_last_message(&mut self) {
+        if self.waiting {
+            return;
+        }
+
+        if let Some(Assistant(content)) = self.messages.last() {
+            if content.is_empty() {
+                // pop twice because empty content is not visible for the user
+                self.messages.pop();
+            }
+        }
+
+        self.messages.pop();
+        self.llm_error = None;
+        self.update_chat_widgets();
     }
 
     pub fn clear_chat(&mut self) {
