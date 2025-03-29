@@ -1,7 +1,7 @@
 use core::str;
 use std::{any::Any, borrow::BorrowMut, path::PathBuf, sync::Arc};
 
-use git2::{Status, SubmoduleIgnore, DiffOptions};
+use git2::{DiffOptions, Status, SubmoduleIgnore};
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -253,7 +253,7 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
 
     let repo = repository.unwrap();
     let file_path = PathBuf::from(&props.file_path);
-    
+
     // Check if file exists
     let full_path = project.get_repo_path().unwrap().join(&file_path);
     if !full_path.exists() {
@@ -279,10 +279,11 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
 
     // If we have a HEAD, compare with it
     if let Some(head_tree) = head_tree {
-        let diff = match repo.diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_options)) {
-            Ok(diff) => diff,
-            Err(e) => return json!(format!("Error creating diff: {}", e)),
-        };
+        let diff =
+            match repo.diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_options)) {
+                Ok(diff) => diff,
+                Err(e) => return json!(format!("Error creating diff: {}", e)),
+            };
 
         // Format diff output
         let mut diff_output = String::new();
@@ -295,11 +296,11 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
 
             // Format the output
             let prefix = match origin {
-                '+' => "+",  // Added
-                '-' => "-",  // Removed
-                'H' => "", // Hunk header
+                '+' => "+", // Added
+                '-' => "-", // Removed
+                'H' => "",  // Hunk header
                 'B' => "",  // Binary content
-                _ => "",     // Context and other lines
+                _ => "",    // Context and other lines
             };
 
             diff_output.push_str(&format!("{}{}", prefix, content));
@@ -309,7 +310,7 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
         }
 
         diff_result = diff_output;
-        
+
         // If empty, the file might be staged
         if diff_result.is_empty() {
             let diff = match repo.diff_index_to_workdir(None, Some(&mut diff_options)) {
@@ -327,11 +328,11 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
 
                 // Format the output
                 let prefix = match origin {
-                    '+' => "+",  // Added
-                    '-' => "-",  // Removed
-                    'H' => "", // Hunk header
+                    '+' => "+", // Added
+                    '-' => "-", // Removed
+                    'H' => "",  // Hunk header
                     'B' => "",  // Binary content
-                    _ => "",     // Context and other lines
+                    _ => "",    // Context and other lines
                 };
 
                 staged_output.push_str(&format!("{}{}", prefix, content));
