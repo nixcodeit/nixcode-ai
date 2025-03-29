@@ -13,6 +13,8 @@ struct CommandInfo {
     description: &'static str,        // Description of what the command does
 }
 
+const MAX_DISPLAYED_SUGGESTIONS: usize = 5;
+
 const AVAILABLE_COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "quit",
@@ -212,7 +214,7 @@ impl CommandPopup {
 
         self.selected_suggestion = Some(match self.selected_suggestion {
             None => 0,
-            Some(index) => (index + 1) % self.suggestions.len().min(5),
+            Some(index) => (index + 1) % self.suggestions.len().min(MAX_DISPLAYED_SUGGESTIONS),
         });
     }
 
@@ -277,7 +279,7 @@ impl CommandPopup {
 impl Widget for &CommandPopup {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Calculate dimensions
-        let suggestion_height = self.suggestions.len().min(5) as u16;
+        let suggestion_height = self.suggestions.len().min(MAX_DISPLAYED_SUGGESTIONS) as u16;
         let has_suggestions = suggestion_height > 0;
         let popup_height = 3 + if has_suggestions { suggestion_height + 1 } else { 0 };
         let popup_width = area.width;
