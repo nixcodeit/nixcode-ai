@@ -6,15 +6,22 @@ use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct ProjectAnalysisPromptParams {
-    #[schemars(description = "Optional focus area for analysis (e.g., 'architecture', 'dependencies', 'workflow')")]
+    #[schemars(
+        description = "Optional focus area for analysis (e.g., 'architecture', 'dependencies', 'workflow')"
+    )]
     #[serde(default)]
     focus: Option<String>,
 }
 
-#[tool("Generate a project analysis prompt for LLM to understand codebase structure and architecture")]
-pub async fn get_project_analysis_prompt(params: ProjectAnalysisPromptParams, _project: Arc<Project>) -> serde_json::Value {
+#[tool(
+    "Generate a project analysis prompt for LLM to understand codebase structure and architecture"
+)]
+pub async fn get_project_analysis_prompt(
+    params: ProjectAnalysisPromptParams,
+    _project: Arc<Project>,
+) -> serde_json::Value {
     let focus = params.focus.unwrap_or_default();
-    
+
     let mut prompt = String::from(
         "# Project Analysis Task\n\n\
         ## Objective\n\
@@ -43,8 +50,11 @@ pub async fn get_project_analysis_prompt(params: ProjectAnalysisPromptParams, _p
            - Look for comments in key files that explain architecture decisions\n\n");
 
     if !focus.is_empty() {
-        prompt.push_str(&format!("## Special Focus Area: {}\n\
-            Pay particular attention to aspects related to '{}' in your analysis.\n\n", focus, focus));
+        prompt.push_str(&format!(
+            "## Special Focus Area: {}\n\
+            Pay particular attention to aspects related to '{}' in your analysis.\n\n",
+            focus, focus
+        ));
     }
 
     prompt.push_str(
@@ -79,9 +89,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_project_analysis_prompt() {
         let project = Arc::new(Project::new(PathBuf::from("/tmp")));
-        let params = ProjectAnalysisPromptParams {
-            focus: None,
-        };
+        let params = ProjectAnalysisPromptParams { focus: None };
 
         let result = get_project_analysis_prompt(params, project).await;
         assert!(result.is_string());

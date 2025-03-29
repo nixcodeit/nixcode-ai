@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::ffi::OsStr;
+use std::path::PathBuf;
 
 pub fn join_path(base: impl Into<PathBuf>, path: impl Into<PathBuf>) -> anyhow::Result<PathBuf> {
     let path = path.into();

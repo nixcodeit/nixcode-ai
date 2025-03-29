@@ -196,9 +196,7 @@ pub enum MessageResponseStreamEvent {
     MessageDelta(MessageDeltaEventContent),
     MessageStop,
     Ping,
-    Error {
-        error: ErrorContent,
-    },
+    Error { error: ErrorContent },
 }
 
 #[derive(Debug)]
@@ -289,7 +287,10 @@ impl LLMClient {
         }
     }
 
-    pub async fn send(&self, request: Request) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
+    pub async fn send(
+        &self,
+        request: Request,
+    ) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
         match self {
             LLMClient::OpenAI(client) => client.send(request).await,
             LLMClient::Anthropic(client) => client.send(request).await,
@@ -303,11 +304,13 @@ pub trait LLMClientImpl {
     fn count_tokens(
         &self,
         request: Request,
-    ) -> impl std::future::Future<Output=Result<u32, LLMError>> + Sync;
+    ) -> impl std::future::Future<Output = Result<u32, LLMError>> + Sync;
     fn send(
         &self,
         request: Request,
-    ) -> impl std::future::Future<Output=Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError>> + Sync;
+    ) -> impl std::future::Future<
+        Output = Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError>,
+    > + Sync;
 
     fn get_config(&self) -> LLMConfig;
 }
@@ -317,7 +320,10 @@ impl LLMClientImpl for OpenAIClient {
         todo!()
     }
 
-    async fn send(&self, request: Request) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
+    async fn send(
+        &self,
+        request: Request,
+    ) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
         todo!()
     }
 
@@ -401,11 +407,13 @@ impl LLMClientImpl for AnthropicClient {
 
         Ok(body.unwrap().input_tokens)
     }
-    async fn send(&self, request: Request) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
+    async fn send(
+        &self,
+        request: Request,
+    ) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
         let mut body = serde_json::to_value(&request).unwrap();
         if request.is_cache_enabled() && !request.messages.is_empty() {
-            body
-                .as_object_mut()
+            body.as_object_mut()
                 .unwrap()
                 .get_mut("messages")
                 .unwrap()
@@ -426,8 +434,7 @@ impl LLMClientImpl for AnthropicClient {
                 .insert("cache_control".into(), json!({"type": "ephemeral"}));
 
             if request.system.is_some() {
-                body
-                    .as_object_mut()
+                body.as_object_mut()
                     .unwrap()
                     .get_mut("system")
                     .unwrap()
@@ -440,8 +447,7 @@ impl LLMClientImpl for AnthropicClient {
                     .insert("cache_control".into(), json!({"type": "ephemeral"}));
             }
             if request.tools.is_some() {
-                body
-                    .as_object_mut()
+                body.as_object_mut()
                     .unwrap()
                     .get_mut("tools")
                     .unwrap()
@@ -485,7 +491,8 @@ impl LLMClientImpl for AnthropicClient {
                         let event = MessageResponseStreamEvent::try_from(event);
 
                         if let Err(err) = event {
-                            tx.send(MessageResponseStreamEvent::Error { error: err.into() }).ok();
+                            tx.send(MessageResponseStreamEvent::Error { error: err.into() })
+                                .ok();
                             continue;
                         }
 
@@ -496,8 +503,9 @@ impl LLMClientImpl for AnthropicClient {
                             error: ErrorContent {
                                 r#type: "EventStreamError".into(),
                                 message: e.to_string(),
-                            }
-                        }).ok();
+                            },
+                        })
+                        .ok();
                     }
                 };
             }

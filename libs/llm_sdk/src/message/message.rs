@@ -1,6 +1,6 @@
+use crate::message::content::tools::ToolUseState;
 use crate::message::content::Content;
 use serde::{Deserialize, Serialize};
-use crate::message::content::tools::ToolUseState;
 
 pub type Contents = Vec<Content>;
 

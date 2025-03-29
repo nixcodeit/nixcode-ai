@@ -209,8 +209,12 @@ impl App {
         let command = command.trim();
         match command {
             "quit" => self.quit(),
-            "clear" => { self.tx.send(AppEvent::ClearChat).ok(); },
-            "retry" => { self.tx.send(AppEvent::RetryLastMessage).ok(); },
+            "clear" => {
+                self.tx.send(AppEvent::ClearChat).ok();
+            }
+            "retry" => {
+                self.tx.send(AppEvent::RetryLastMessage).ok();
+            }
             "remove-last-message" => self.chat_view.remove_last_message(),
             _ => panic!("Command not implemented: {}", command),
         }

@@ -34,10 +34,13 @@ pub struct DeleteFileParams {
 }
 
 #[tool("Create empty file in given path")]
-pub async fn create_file(params: CreateFileParams, project: std::sync::Arc<Project>) -> serde_json::Value {
+pub async fn create_file(
+    params: CreateFileParams,
+    project: std::sync::Arc<Project>,
+) -> serde_json::Value {
+    use crate::utils::fs;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
-    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
@@ -66,14 +69,17 @@ pub async fn create_file(params: CreateFileParams, project: std::sync::Arc<Proje
             f.write_all(b"").await.unwrap();
             serde_json::json!("File created")
         }
-        Err(e) => serde_json::json!(e.to_string())
+        Err(e) => serde_json::json!(e.to_string()),
     }
 }
 
 #[tool("Read file content")]
-pub async fn read_text_file(params: ReadTextFileParams, project: Arc<Project>) -> serde_json::Value {
-    use tokio::fs::read_to_string;
+pub async fn read_text_file(
+    params: ReadTextFileParams,
+    project: Arc<Project>,
+) -> serde_json::Value {
     use crate::utils::fs;
+    use tokio::fs::read_to_string;
 
     let file_path = PathBuf::from(params.path);
 
@@ -94,15 +100,18 @@ pub async fn read_text_file(params: ReadTextFileParams, project: Arc<Project>) -
         Ok(content) => {
             serde_json::json!(content)
         }
-        Err(e) => serde_json::json!(e.to_string())
+        Err(e) => serde_json::json!(e.to_string()),
     }
 }
 
 #[tool("Update file content")]
-pub async fn update_text_file(params: UpdateTextFileParams, project: Arc<Project>) -> serde_json::Value {
+pub async fn update_text_file(
+    params: UpdateTextFileParams,
+    project: Arc<Project>,
+) -> serde_json::Value {
+    use crate::utils::fs;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
-    use crate::utils::fs;
 
     let file_path = PathBuf::from(params.path);
 
@@ -124,14 +133,14 @@ pub async fn update_text_file(params: UpdateTextFileParams, project: Arc<Project
             f.write_all(params.content.as_bytes()).await.unwrap();
             serde_json::json!("File updated")
         }
-        Err(e) => serde_json::json!(e.to_string())
+        Err(e) => serde_json::json!(e.to_string()),
     }
 }
 
 #[tool("Delete file")]
 pub async fn delete_file(params: DeleteFileParams, project: Arc<Project>) -> serde_json::Value {
-    use tokio::fs::remove_file;
     use crate::utils::fs;
+    use tokio::fs::remove_file;
 
     let file_path = PathBuf::from(params.path);
 
@@ -152,7 +161,7 @@ pub async fn delete_file(params: DeleteFileParams, project: Arc<Project>) -> ser
         Ok(_) => {
             serde_json::json!("File removed")
         }
-        Err(e) => serde_json::json!(e.to_string())
+        Err(e) => serde_json::json!(e.to_string()),
     }
 }
 
@@ -200,7 +209,10 @@ mod tests {
 
         let result = create_file(params, project).await;
 
-        assert_eq!(result, serde_json::json!("Path must be inside project directory"));
+        assert_eq!(
+            result,
+            serde_json::json!("Path must be inside project directory")
+        );
     }
 
     #[tokio::test]

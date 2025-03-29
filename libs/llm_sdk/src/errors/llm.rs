@@ -56,17 +56,18 @@ impl Into<ErrorContent> for LLMError {
             message: match self {
                 LLMError::CreateClientError(e) => e,
                 LLMError::InvalidRequest => "Invalid request".into(),
-                LLMError::InvalidResponseCode(code, body) => format!(
-                    "Invalid response code: {} with body: {}",
-                    code, body
-                ),
+                LLMError::InvalidResponseCode(code, body) => {
+                    format!("Invalid response code: {} with body: {}", code, body)
+                }
                 LLMError::InvalidResponse(e) => e,
                 LLMError::ParseError(e) => e,
                 LLMError::ReqwestError => "Reqwest error".into(),
                 LLMError::NetworkError => "Network error".into(),
                 LLMError::Timeout => "Timeout".into(),
                 LLMError::InputTooLong => "Input too long".into(),
-                LLMError::MissingAPIKey => "Missing API key. Please provide in config file or environment variable.".into(),
+                LLMError::MissingAPIKey => {
+                    "Missing API key. Please provide in config file or environment variable.".into()
+                }
                 LLMError::Generic(e) => e,
             },
         }

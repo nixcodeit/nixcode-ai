@@ -9,7 +9,9 @@ pub struct TextContent {
 
 impl TextContent {
     pub fn new(text: String) -> Self {
-        Self { text: text.trim().to_string() }
+        Self {
+            text: text.trim().to_string(),
+        }
     }
 
     pub fn get_text(&self) -> String {

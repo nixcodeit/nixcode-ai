@@ -104,9 +104,9 @@ impl CommandPopup {
             return false;
         }
 
-        AVAILABLE_COMMANDS.iter().any(|cmd|
-            cmd.name == input || cmd.aliases.contains(&input)
-        )
+        AVAILABLE_COMMANDS
+            .iter()
+            .any(|cmd| cmd.name == input || cmd.aliases.contains(&input))
     }
 
     // Convert aliases to their primary command
@@ -170,18 +170,22 @@ impl CommandPopup {
         }
 
         // Sort suggestions - primary commands first, then alphabetically
-        self.suggestions.sort_by(|a, b| {
-            match (a.is_alias, b.is_alias) {
+        self.suggestions
+            .sort_by(|a, b| match (a.is_alias, b.is_alias) {
                 (false, true) => std::cmp::Ordering::Less,
                 (true, false) => std::cmp::Ordering::Greater,
                 _ => a.display_name.cmp(&b.display_name),
-            }
-        });
+            });
 
         // Reset selection if needed
-        if self.selected_suggestion.is_some() &&
-            (self.selected_suggestion.unwrap() >= self.suggestions.len()) {
-            self.selected_suggestion = if self.suggestions.is_empty() { None } else { Some(0) }
+        if self.selected_suggestion.is_some()
+            && (self.selected_suggestion.unwrap() >= self.suggestions.len())
+        {
+            self.selected_suggestion = if self.suggestions.is_empty() {
+                None
+            } else {
+                Some(0)
+            }
         }
     }
 
@@ -217,7 +221,13 @@ impl CommandPopup {
 
         self.selected_suggestion = Some(match self.selected_suggestion {
             None => 0,
-            Some(index) => if index == 0 { self.suggestions.len() - 1 } else { index - 1 },
+            Some(index) => {
+                if index == 0 {
+                    self.suggestions.len() - 1
+                } else {
+                    index - 1
+                }
+            }
         });
     }
 
@@ -229,7 +239,7 @@ impl CommandPopup {
                     KeyCode::Enter => {
                         self.execute_command();
                         return;
-                    },
+                    }
                     KeyCode::Tab => {
                         if self.suggestions.is_empty() {
                             self.update_suggestions();
@@ -240,15 +250,15 @@ impl CommandPopup {
                             self.complete_suggestion();
                         }
                         return;
-                    },
+                    }
                     KeyCode::Down => {
                         self.next_suggestion();
                         return;
-                    },
+                    }
                     KeyCode::Up => {
                         self.prev_suggestion();
                         return;
-                    },
+                    }
                     KeyCode::Esc => {
                         // Reset invalid command indication
                         self.command_is_valid = true;
@@ -271,7 +281,11 @@ impl Widget for &CommandPopup {
         // Calculate dimensions
         let suggestion_height = self.suggestions.len().min(MAX_DISPLAYED_SUGGESTIONS) as u16;
         let has_suggestions = suggestion_height > 0;
-        let popup_height = 3 + if has_suggestions { suggestion_height + 1 } else { 0 };
+        let popup_height = 3 + if has_suggestions {
+            suggestion_height + 1
+        } else {
+            0
+        };
         let popup_width = area.width;
 
         let popup_area = Rect {
@@ -286,9 +300,17 @@ impl Widget for &CommandPopup {
 
         // Set title based on command validity
         let (title, title_style) = if !self.command_is_valid {
-            ("Invalid Command", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            (
+                "Invalid Command",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )
         } else {
-            ("Command", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+            (
+                "Command",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
         };
 
         // Render the input block
@@ -367,12 +389,19 @@ impl CommandPopup {
         }
     }
 
-    fn render_suggestion(&self, buf: &mut Buffer, area: Rect, suggestion: &CommandSuggestion, is_selected: bool) {
+    fn render_suggestion(
+        &self,
+        buf: &mut Buffer,
+        area: Rect,
+        suggestion: &CommandSuggestion,
+        is_selected: bool,
+    ) {
         // Set background for selected suggestion
         if is_selected {
             for x in area.x..area.x + area.width {
                 for y in area.y..area.y + area.height {
-                    buf.get_mut(x, y).set_style(Style::default().bg(Color::DarkGray));
+                    buf.get_mut(x, y)
+                        .set_style(Style::default().bg(Color::DarkGray));
                 }
             }
         }
@@ -381,20 +410,39 @@ impl CommandPopup {
         let name_style = Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD)
-            .bg(if is_selected { Color::DarkGray } else { Color::Reset });
+            .bg(if is_selected {
+                Color::DarkGray
+            } else {
+                Color::Reset
+            });
 
-        let alias_style = Style::default()
-            .fg(Color::Green)
-            .bg(if is_selected { Color::DarkGray } else { Color::Reset });
+        let alias_style = Style::default().fg(Color::Green).bg(if is_selected {
+            Color::DarkGray
+        } else {
+            Color::Reset
+        });
 
         let desc_style = Style::default()
-            .fg(if is_selected { Color::White } else { Color::Gray })
-            .bg(if is_selected { Color::DarkGray } else { Color::Reset });
+            .fg(if is_selected {
+                Color::White
+            } else {
+                Color::Gray
+            })
+            .bg(if is_selected {
+                Color::DarkGray
+            } else {
+                Color::Reset
+            });
 
         // Render command name and description
         let mut x_offset = 0;
 
-        buf.set_string(area.x + x_offset, area.y, &suggestion.display_name, name_style);
+        buf.set_string(
+            area.x + x_offset,
+            area.y,
+            &suggestion.display_name,
+            name_style,
+        );
         x_offset += suggestion.display_name.len() as u16;
 
         // Show alias information if applicable
@@ -407,6 +455,11 @@ impl CommandPopup {
         buf.set_string(area.x + x_offset, area.y, ": ", desc_style);
         x_offset += 2;
 
-        buf.set_string(area.x + x_offset, area.y, suggestion.description, desc_style);
+        buf.set_string(
+            area.x + x_offset,
+            area.y,
+            suggestion.description,
+            desc_style,
+        );
     }
 }
