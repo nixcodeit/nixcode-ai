@@ -76,20 +76,20 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: ${{ env.BINARY_NAME }}-linux-amd64
-            asset_name: ${{ env.BINARY_NAME }}-linux-amd64.tar.gz
+            artifact_name: nixcode-cli-linux-amd64
+            asset_name: nixcode-cli-linux-amd64.tar.gz
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: ${{ env.BINARY_NAME }}-macos-amd64
-            asset_name: ${{ env.BINARY_NAME }}-macos-amd64.tar.gz
+            artifact_name: nixcode-cli-macos-amd64
+            asset_name: nixcode-cli-macos-amd64.tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: ${{ env.BINARY_NAME }}-macos-arm64
-            asset_name: ${{ env.BINARY_NAME }}-macos-arm64.tar.gz
+            artifact_name: nixcode-cli-macos-arm64
+            asset_name: nixcode-cli-macos-arm64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: ${{ env.BINARY_NAME }}-windows-amd64
-            asset_name: ${{ env.BINARY_NAME }}-windows-amd64.zip
+            artifact_name: nixcode-cli-windows-amd64
+            asset_name: nixcode-cli-windows-amd64.zip
 
     runs-on: ${{ matrix.os }}
     steps:
