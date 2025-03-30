@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use toml;
 
 /// Default model for Anthropic
-const DEFAULT_ANTHROPIC_MODEL: &str = "claude-3-haiku";
+const DEFAULT_ANTHROPIC_MODEL: &str = "claude-3-7-sonnet-20250219";
 /// Default model for OpenAI
 const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
 
