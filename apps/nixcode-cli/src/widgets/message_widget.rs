@@ -3,10 +3,36 @@ use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use ratatui::prelude::*;
 use ratatui::text::Line;
+use serde_json::Value;
 
 pub struct MessageWidget {}
 
 impl MessageWidget {
+    // Helper function to format tool parameters
+    fn format_tool_params(params: &Value) -> String {
+        if !params.is_object() {
+            return String::new();
+        }
+
+        let obj = params.as_object().unwrap();
+        let mut formatted_params = Vec::new();
+
+        for (key, value) in obj {
+            let formatted_value = match value {
+                Value::String(s) if s.len() > 50 => "[long content]".to_string(),
+                Value::String(s) => serde_json::to_string(s).unwrap_or(format!("\"{}\"", s)),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                Value::Null => "null".to_string(),
+                Value::Array(_) => "[array]".to_string(),
+                Value::Object(_) => "{object}".to_string(),
+            };
+            formatted_params.push(format!("{}: {}", key, formatted_value));
+        }
+
+        formatted_params.join(", ")
+    }
+
     pub fn get_lines<'a>(message: Message) -> Vec<Line<'a>> {
         let author = match message {
             Message::User { .. } => Span::styled("You > ", Style::new().green()),
@@ -48,21 +74,27 @@ impl MessageWidget {
                     lines
                 }
                 Content::ToolUse(tool_use) => {
+                    let (_, params) = tool_use.get_execute_params();
+                    let formatted_params = Self::format_tool_params(&params);
+                    let tool_info = if formatted_params.is_empty() {
+                        format!("[{}]", tool_use.get_tool_name())
+                    } else {
+                        format!("[{}]({})", tool_use.get_tool_name(), formatted_params)
+                    };
+
                     vec![
                         match tool_use.get_state() {
                             ToolUseState::Created => {
-                                Line::from(format!("[{}] waiting", tool_use.get_tool_name())).bold()
+                                Line::from(format!("{} waiting", tool_info)).bold()
                             }
                             ToolUseState::Executing => {
-                                Line::from(format!("[{}] executing", tool_use.get_tool_name()))
-                                    .bold()
+                                Line::from(format!("{} executing", tool_info)).bold()
                             }
                             ToolUseState::Executed => {
-                                Line::from(format!("[{}] finished", tool_use.get_tool_name()))
-                                    .bold()
+                                Line::from(format!("{} finished", tool_info)).bold()
                             }
                             ToolUseState::Error => {
-                                Line::from(format!("[{}] failed", tool_use.get_tool_name())).bold()
+                                Line::from(format!("{} failed", tool_info)).bold()
                             }
                         },
                         Line::from(vec![]),
