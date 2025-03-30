@@ -35,6 +35,8 @@ The application follows an event-driven architecture where:
 - **widgets/chat.rs**: Chat interface implementation
 - **command_popup.rs**: Command popup UI for executing special commands
 - **user_input.rs**: Text input handling
+- **status_bar.rs**: Status bar displaying the current input mode, application version, and date/time
+- **popup_utils.rs**: Utilities for creating and positioning popup dialogs in the UI
 
 ### Libraries
 
@@ -45,7 +47,7 @@ The application follows an event-driven architecture where:
 - **tools.rs**: Tool definition system for LLM function calling
 
 #### nixcode (Core Utilities)
-- **tools/**: Tool implementation (filesystem operations, glob search, etc.)
+- **tools/**: Tool implementation (filesystem operations, glob search, git, etc.)
 - **project/**: Project management functionality
 - **prompts/**: System prompts and templates
 - **utils/**: Utility functions
@@ -61,6 +63,18 @@ The tool system is a key architectural feature allowing the LLM to:
 3. Receive results back to continue the conversation
 
 This enables capabilities like file searching, content reading/writing, and more.
+
+#### Available Tools
+The project implements several tools in the `libs/nixcode/src/tools/` directory:
+- **fs.rs**: File system operations (reading, writing, creating, deleting files)
+- **git.rs**: Git operations (status, add, commit, diff)
+- **glob.rs**: Glob pattern file searching
+- **search_content.rs**: Content searching within files
+- **replace_content.rs**: Find and replace content in files
+- **content_utils.rs**: Utility functions for content manipulation
+- **prompt.rs**: Prompt-related utilities
+
+All tools implement the `Tool` trait defined in `tools/mod.rs`, which provides a standardized interface for tool registration, schema definition, and execution.
 
 ## Workflow
 
@@ -100,6 +114,7 @@ This enables capabilities like file searching, content reading/writing, and more
 - **anyhow**: Error handling
 - **secrecy**: Secure credential handling
 - **eventsource-stream**: Server-sent events handling
+- **chrono**: Date and time handling for the status bar
 
 ## Organization Patterns
 
@@ -113,6 +128,18 @@ This enables capabilities like file searching, content reading/writing, and more
 - Trait-based abstractions for flexibility
 - Event-driven architecture for UI and async operations
 - Clear separation between UI rendering and business logic
+- Angular Commit Convention for git commit messages
+
+### Git Commit Convention
+The project follows the Angular Commit Convention for consistent and descriptive commit messages:
+- Format: `<type>(<scope>): <description>`
+- Types include: feat, fix, docs, style, refactor, perf, test, chore, etc.
+- Examples:
+  - `feat(tools): add filesystem search capability`
+  - `fix(ui): resolve chat scrolling issue`
+  - `docs(readme): update installation instructions`
+- Commit messages should clearly describe what changes were made and why
+- This convention helps with automated changelog generation and versioning
 
 ### Data Flow Patterns
 - Message-passing between components
@@ -138,3 +165,5 @@ This enables capabilities like file searching, content reading/writing, and more
    - For LLM provider integrations, update `libs/llm_sdk/src/providers.rs`
 
 7. **Testing**: The codebase includes some test patterns in the tools modules that can be followed for adding new tests.
+
+8. **Documentation Maintenance**: When adding, modifying, or removing features that affect the project structure (new tools, UI components, libraries, etc.), update this analysis document (`.nixcode/init.md`) to ensure it remains accurate and useful for new developers. Outdated documentation can lead to confusion and slower onboarding.

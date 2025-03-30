@@ -139,6 +139,7 @@ impl Nixcode {
         let mut system_prompt = vec![Content::new_text(SYSTEM_PROMPT)];
         let project_init_analysis_content = self.project.get_project_init_analysis_content();
         if let Some(content) = project_init_analysis_content {
+            let content = format!("{}\n\n{}", "File: .nixcode/init.md", content);
             system_prompt.push(Content::new_text(content));
         }
 
