@@ -1,5 +1,5 @@
 use crate::project::Project;
-use crate::tools::content_utils::{
+use crate::tools::search::content_utils::{
     filter_paths, get_glob_paths, validate_and_resolve_glob, validate_regex,
 };
 use nixcode_macros::tool;
@@ -13,23 +13,23 @@ use std::sync::Arc;
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct ReplaceContentParams {
     #[schemars(description = "Regex pattern to search for in file content")]
-    pattern: String,
+    pub pattern: String,
 
     #[schemars(description = "Replacement string (can use regex capture groups like $1, $2)")]
-    replacement: String,
+    pub replacement: String,
 
     #[schemars(description = "Glob pattern for files to search in")]
-    glob_pattern: String,
+    pub glob_pattern: String,
 
     #[schemars(description = "Include files excluded by gitignore (default: false)")]
     #[serde(default)]
-    include_gitignored: Option<bool>,
+    pub include_gitignored: Option<bool>,
 
     #[schemars(
         description = "Include hidden (prefixed with `.`, like `.github`, `.nixcode` etc) (default: false)"
     )]
     #[serde(default)]
-    include_hidden: Option<bool>,
+    pub include_hidden: Option<bool>,
 }
 
 #[derive(Serialize)]

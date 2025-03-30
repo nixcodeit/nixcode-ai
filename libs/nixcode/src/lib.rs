@@ -7,11 +7,19 @@ mod utils;
 use crate::config::Config;
 use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
-use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
-use crate::tools::glob::SearchGlobFilesTool;
-use crate::tools::prompt::GetProjectAnalysisPromptTool;
-use crate::tools::replace_content::ReplaceContentTool;
-use crate::tools::search_content::SearchContentTool;
+// Zaktualizowane importy dla nowych lokalizacji narzędzi
+use crate::tools::fs::create_file::CreateFileTool;
+use crate::tools::fs::delete_file::DeleteFileTool;
+use crate::tools::fs::read_text_file::ReadTextFileTool;
+use crate::tools::fs::update_text_file::UpdateTextFileTool;
+use crate::tools::git::git_add::GitAddTool;
+use crate::tools::git::git_commit::GitCommitTool;
+use crate::tools::git::git_diff::GitDiffTool;
+use crate::tools::git::git_status::GitStatusTool;
+use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
+use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
+use crate::tools::search::replace_content::ReplaceContentTool;
+use crate::tools::search::search_content::SearchContentTool;
 use crate::tools::Tools;
 use anyhow::Result;
 use nixcode_llm_sdk::config::LLMConfig;
@@ -24,7 +32,6 @@ use std::default::Default;
 use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
-use tools::git::{GitAddTool, GitCommitTool, GitDiffTool, GitStatusTool};
 
 pub struct Nixcode {
     project: Arc<Project>,
