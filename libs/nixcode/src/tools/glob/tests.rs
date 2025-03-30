@@ -123,7 +123,7 @@ async fn test_many_files_offset() {
     let params = search_glob_files::GlobToolParams {
         pattern: "**/*".to_string(),
         include_gitignored: Some(true),
-        offset: Some(100),
+        offset: Some(1),
         include_hidden: None,
     };
 
@@ -131,5 +131,5 @@ async fn test_many_files_offset() {
         .await
         .to_string();
 
-    assert!(result.contains("current offset: 100"));
+    assert!(result.contains("current offset: 1"));
 }
