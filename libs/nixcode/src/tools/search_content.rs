@@ -1,13 +1,13 @@
 use crate::project::Project;
-use glob::glob;
+use crate::tools::content_utils::{
+    filter_paths, get_glob_paths, validate_and_resolve_glob, validate_regex,
+};
 use nixcode_macros::tool;
-use regex::Regex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -45,187 +45,123 @@ pub async fn search_content(
     params: SearchContentParams,
     project: Arc<Project>,
 ) -> serde_json::Value {
-    if params.pattern.is_empty() {
-        return json!("Search pattern is empty");
-    }
-
-    if params.glob_pattern.is_empty() {
-        return json!("Glob pattern is empty");
-    }
-
-    // Compile regex pattern
-    let regex = match Regex::new(&params.pattern) {
+    // Validate regex pattern
+    let regex = match validate_regex(&params.pattern) {
         Ok(re) => re,
-        Err(e) => return json!(format!("Invalid regex pattern: {}", e)),
+        Err(e) => return e,
     };
 
-    // Create glob pattern
-    let pattern_path_buf = PathBuf::from(&params.glob_pattern);
-    if !pattern_path_buf.is_relative() {
-        return json!("Glob pattern must be a relative path");
-    }
-
-    let pattern = match crate::utils::fs::join_path(project.get_cwd(), params.glob_pattern.clone())
-    {
+    // Validate and resolve glob pattern
+    let pattern_str = match validate_and_resolve_glob(&project, &params.glob_pattern) {
         Ok(p) => p,
-        Err(e) => return json!(e.to_string()),
+        Err(e) => return e,
     };
-
-    let pattern_str = pattern.to_str().unwrap().to_string();
 
     // Get matching files using glob
-    let glob_result = tokio::task::spawn_blocking(move || glob(&pattern_str))
-        .await
-        .unwrap();
+    let paths = match get_glob_paths(pattern_str).await {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
 
-    match glob_result {
-        Ok(paths) => {
-            let include_hidden = params.include_hidden.unwrap_or(false);
-            let include_git = params.include_gitignored.unwrap_or(false);
-            let offset = params.offset.unwrap_or(0);
-            const LIMIT: usize = 100;
+    // Parse options
+    let include_hidden = params.include_hidden.unwrap_or(false);
+    let include_git = params.include_gitignored.unwrap_or(false);
+    let offset = params.offset.unwrap_or(0);
+    const LIMIT: usize = 100;
 
-            // Get all file paths
-            let paths = tokio::task::spawn_blocking(move || {
-                paths.filter_map(|p| p.ok()).collect::<Vec<_>>()
-            })
-            .await
-            .unwrap();
+    // Filter paths based on gitignore and hidden files settings
+    let filtered_paths = filter_paths(project.clone(), paths, include_hidden, include_git).await;
 
-            // Filter paths based on gitignore and hidden files settings
-            let cwd = project.get_cwd().clone();
-            let paths = tokio::task::spawn_blocking(move || {
-                let repository = git2::Repository::discover(project.get_cwd().as_path()).ok();
+    // Search the files for content matches
+    let regex_pattern = regex.clone();
+    let results = tokio::task::spawn_blocking(move || {
+        let mut matches = Vec::new();
+        let mut total_matches = 0;
 
-                paths
-                    .iter()
-                    .filter_map(|path| {
-                        let result = path.strip_prefix(&cwd);
-                        if result.is_err() {
-                            return None;
-                        }
+        for (file_path, rel_path) in filtered_paths {
+            // Skip directories
+            if file_path.is_dir() {
+                continue;
+            }
 
-                        let rel_path = result.unwrap().to_str()?;
+            // Try to open the file
+            let file = match File::open(&file_path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
 
-                        // Check if file should be included based on .git and hidden file filters
-                        if !include_git && rel_path.contains(".git/") {
-                            return None;
-                        } else if include_git && rel_path.starts_with(".git") {
-                            return Some((path.clone(), rel_path.to_string()));
-                        }
+            // Read the file line by line and check for matches
+            let reader = BufReader::new(file);
+            for (line_num, line_result) in reader.lines().enumerate() {
+                // Skip lines that can't be read
+                let line = match line_result {
+                    Ok(l) => l,
+                    Err(_) => continue,
+                };
 
-                        if !include_hidden && (rel_path.starts_with(".") || rel_path.contains("/."))
-                        {
-                            return None;
-                        }
+                // Check if line matches regex
+                if regex_pattern.is_match(&line) {
+                    total_matches += 1;
 
-                        // Check gitignore
-                        if let Some(repo) = &repository {
-                            if repo.is_path_ignored(rel_path).unwrap_or(false) {
-                                return None;
-                            }
-                        }
-
-                        Some((path.clone(), rel_path.to_string()))
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .await
-            .unwrap();
-
-            // Search the files for content matches
-            let regex_pattern = regex.clone();
-            let results = tokio::task::spawn_blocking(move || {
-                let mut matches = Vec::new();
-                let mut total_matches = 0;
-
-                for (file_path, rel_path) in paths {
-                    // Skip directories
-                    if file_path.is_dir() {
+                    // Skip matches before the offset
+                    if total_matches <= offset {
                         continue;
                     }
 
-                    // Try to open the file
-                    let file = match File::open(&file_path) {
-                        Ok(f) => f,
-                        Err(_) => continue,
-                    };
+                    matches.push(SearchMatch {
+                        path: rel_path.clone(),
+                        line_number: line_num + 1, // 1-based line numbers
+                        line_content: line.trim().to_string(),
+                    });
 
-                    // Read the file line by line and check for matches
-                    let reader = BufReader::new(file);
-                    for (line_num, line_result) in reader.lines().enumerate() {
-                        // Skip lines that can't be read
-                        let line = match line_result {
-                            Ok(l) => l,
-                            Err(_) => continue,
-                        };
-
-                        // Check if line matches regex
-                        if regex_pattern.is_match(&line) {
-                            total_matches += 1;
-
-                            // Skip matches before the offset
-                            if total_matches <= offset {
-                                continue;
-                            }
-
-                            matches.push(SearchMatch {
-                                path: rel_path.clone(),
-                                line_number: line_num + 1, // 1-based line numbers
-                                line_content: line.trim().to_string(),
-                            });
-
-                            // Check if we've reached the limit
-                            if matches.len() >= LIMIT {
-                                break;
-                            }
-                        }
-                    }
-
-                    // Stop if we've reached the limit
+                    // Check if we've reached the limit
                     if matches.len() >= LIMIT {
                         break;
                     }
                 }
+            }
 
-                (matches, total_matches)
-            })
-            .await
-            .unwrap();
-
-            // Format the results
-            if results.0.is_empty() {
-                json!("No matches found")
-            } else {
-                let (matches, total_matches) = results;
-                let mut result_str = format!(
-                    "Found {} matches for pattern '{}' in files matching '{}':\n\n",
-                    total_matches, params.pattern, params.glob_pattern
-                );
-
-                for m in &matches {
-                    result_str.push_str(&format!(
-                        "{}:{}: {}\n",
-                        m.path, m.line_number, m.line_content
-                    ));
-                }
-
-                let missing_results = total_matches.saturating_sub(offset + matches.len());
-                if missing_results > 0 {
-                    if offset > 0 {
-                        result_str.push_str(&format!("\n... and {} more matches (current offset: {}), reuse tool with offset parameter", missing_results, offset));
-                    } else {
-                        result_str.push_str(&format!(
-                            "\n... and {} more matches, reuse tool with offset parameter",
-                            missing_results
-                        ));
-                    }
-                }
-
-                json!(result_str)
+            // Stop if we've reached the limit
+            if matches.len() >= LIMIT {
+                break;
             }
         }
-        Err(e) => json!(format!("Error processing glob pattern: {}", e)),
+
+        (matches, total_matches)
+    })
+    .await
+    .unwrap();
+
+    // Format the results
+    if results.0.is_empty() {
+        json!("No matches found")
+    } else {
+        let (matches, total_matches) = results;
+        let mut result_str = format!(
+            "Found {} matches for pattern '{}' in files matching '{}':\n\n",
+            total_matches, params.pattern, params.glob_pattern
+        );
+
+        for m in &matches {
+            result_str.push_str(&format!(
+                "{}:{}: {}\n",
+                m.path, m.line_number, m.line_content
+            ));
+        }
+
+        let missing_results = total_matches.saturating_sub(offset + matches.len());
+        if missing_results > 0 {
+            if offset > 0 {
+                result_str.push_str(&format!("\n... and {} more matches (current offset: {}), reuse tool with offset parameter", missing_results, offset));
+            } else {
+                result_str.push_str(&format!(
+                    "\n... and {} more matches, reuse tool with offset parameter",
+                    missing_results
+                ));
+            }
+        }
+
+        json!(result_str)
     }
 }
 
@@ -235,6 +171,7 @@ mod tests {
     use crate::project::Project;
     use serde_json::json;
     use std::env::current_dir;
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_empty_pattern() {
@@ -288,7 +225,6 @@ mod tests {
         let project = Arc::new(Project::new(PathBuf::from(
             current_dir().unwrap().parent().unwrap().parent().unwrap(),
         )));
-        dbg!(&project);
         let params = SearchContentParams {
             pattern: "SearchContentParams".to_string(), // Should find itself
             glob_pattern: "**/*.rs".to_string(),
@@ -298,7 +234,6 @@ mod tests {
         };
 
         let result = search_content(params, project).await.to_string();
-        dbg!(&result);
         assert!(result.contains("Found"));
         assert!(result.contains("SearchContentParams"));
     }

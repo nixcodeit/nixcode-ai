@@ -3,10 +3,12 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub mod content_utils;
 pub mod fs;
 pub mod git;
 pub mod glob;
 pub mod prompt;
+pub mod replace_content;
 pub mod search_content;
 
 #[async_trait]

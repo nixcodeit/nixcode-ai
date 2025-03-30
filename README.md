@@ -129,6 +129,8 @@ nixcode-ai includes a tool framework that allows the LLM to invoke functions. Th
 
 ### Search Tools
 - **search_glob_files**: Search for files in the project directory using glob patterns, with options to include gitignored and hidden files
+- **search_content**: Search for text content in files using regex patterns, with options for filtering results, including pagination via offset parameter
+- **replace_content**: Replace text content in files based on regex patterns, with support for capture groups in replacements
 
 ### Project Analysis Tools
 - **get_project_analysis_prompt**: Generate a comprehensive project analysis prompt for better understanding of the codebase
@@ -139,6 +141,7 @@ These tools enable powerful use cases such as:
 - Code generation and saving to files
 - Version control operations
 - Project structure understanding
+- Text search and replace across multiple files
 
 The tool system is designed to be extensible, making it easy to add new capabilities for the LLM to leverage.
 
