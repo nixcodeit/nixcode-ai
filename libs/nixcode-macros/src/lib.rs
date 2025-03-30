@@ -1,9 +1,17 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Error, FnArg, Ident, ItemFn, PatType, Type};
+use syn::{parse_macro_input, Error, FnArg, Ident, ItemFn, LitStr, PatType, Type};
 
 #[proc_macro_attribute]
-pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
+    // Parse the description argument
+    let description = if args.is_empty() {
+        None
+    } else {
+        let desc = parse_macro_input!(args as LitStr);
+        Some(desc)
+    };
+
     let func = parse_macro_input!(input as ItemFn);
 
     let func_name = &func.sig.ident;
@@ -49,6 +57,15 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
     let param_ident = &param_type.path.segments.last().unwrap().ident;
     let struct_ident = Ident::new(&format!("{}Tool", tool_name_pascal_case), func_name.span());
 
+    // Prepare the description
+    let description_expr = if let Some(desc) = description {
+        // Use the provided description
+        quote! { #desc.to_string() }
+    } else {
+        // Fallback to auto-generated description
+        quote! { String::from(concat!("Use this tool for ", #tool_name, ". Auto generated.")) }
+    };
+
     let expanded = quote! {
         #func
 
@@ -65,7 +82,7 @@ pub fn tool(_args: TokenStream, input: TokenStream) -> TokenStream {
                 let parameters = serde_json::to_value(&schema).unwrap();
 
                 let tool_name = #tool_name.to_string();
-                let description = String::from(concat!("Use this tool for ", #tool_name, ". Auto generated."));
+                let description = #description_expr;
 
                 nixcode_llm_sdk::tools::Tool::new(tool_name, description, parameters)
             }
