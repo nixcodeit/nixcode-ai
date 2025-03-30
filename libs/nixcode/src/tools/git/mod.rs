@@ -1,6 +1,7 @@
 pub mod git_add;
 pub mod git_commit;
 pub mod git_diff;
+pub mod git_log;
 pub mod git_stash_apply;
 pub mod git_stash_drop;
 pub mod git_stash_list;

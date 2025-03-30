@@ -7,7 +7,6 @@ mod utils;
 use crate::config::Config;
 use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
-// Zaktualizowane importy dla nowych lokalizacji narzędzi
 use crate::tools::fs::create_file::CreateFileTool;
 use crate::tools::fs::delete_file::DeleteFileTool;
 use crate::tools::fs::delete_text_file_partial::DeleteTextFilePartialTool;
@@ -15,8 +14,8 @@ use crate::tools::fs::read_text_file::ReadTextFileTool;
 use crate::tools::fs::update_text_file_partial::UpdateTextFilePartialTool;
 use crate::tools::fs::write_text_file::WriteTextFileTool;
 use crate::tools::git::git_add::GitAddTool;
-use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
+use crate::tools::git::git_log::GitLogTool;
 use crate::tools::git::git_stash_apply::GitStashApplyTool;
 use crate::tools::git::git_stash_drop::GitStashDropTool;
 use crate::tools::git::git_stash_list::GitStashListTool;
@@ -84,6 +83,7 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitStashApplyTool {}));
                     tools.add_tool(Arc::new(GitStashListTool {}));
                     tools.add_tool(Arc::new(GitStashDropTool {}));
+                    tools.add_tool(Arc::new(GitLogTool {}));
                 }
 
                 if !has_init_analysis {
