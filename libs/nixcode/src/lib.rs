@@ -10,8 +10,10 @@ use crate::prompts::system::SYSTEM_PROMPT;
 // Zaktualizowane importy dla nowych lokalizacji narzędzi
 use crate::tools::fs::create_file::CreateFileTool;
 use crate::tools::fs::delete_file::DeleteFileTool;
+use crate::tools::fs::delete_text_file_partial::DeleteTextFilePartialTool;
 use crate::tools::fs::read_text_file::ReadTextFileTool;
-use crate::tools::fs::update_text_file::UpdateTextFileTool;
+use crate::tools::fs::update_text_file_partial::UpdateTextFilePartialTool;
+use crate::tools::fs::write_text_file::WriteTextFileTool;
 use crate::tools::git::git_add::GitAddTool;
 use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
@@ -66,8 +68,10 @@ impl Nixcode {
                 tools.add_tool(Arc::new(SearchGlobFilesTool {}));
                 tools.add_tool(Arc::new(CreateFileTool {}));
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
-                tools.add_tool(Arc::new(UpdateTextFileTool {}));
+                tools.add_tool(Arc::new(WriteTextFileTool {}));
+                tools.add_tool(Arc::new(UpdateTextFilePartialTool {}));
                 tools.add_tool(Arc::new(DeleteFileTool {}));
+                tools.add_tool(Arc::new(DeleteTextFilePartialTool {}));
                 tools.add_tool(Arc::new(SearchContentTool {}));
                 tools.add_tool(Arc::new(ReplaceContentTool {}));
 

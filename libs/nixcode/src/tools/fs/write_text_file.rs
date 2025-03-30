@@ -18,8 +18,10 @@ pub struct UpdateTextFileParams {
     pub content: String,
 }
 
-#[tool("Update file content")]
-pub async fn update_text_file(
+#[tool(
+    "Write file content, overwriting the existing content (use with caution, not for updating part of the file)"
+)]
+pub async fn write_text_file(
     params: UpdateTextFileParams,
     project: Arc<Project>,
 ) -> serde_json::Value {
