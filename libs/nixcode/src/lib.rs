@@ -10,6 +10,7 @@ use crate::prompts::system::SYSTEM_PROMPT;
 use crate::tools::fs::{CreateFileTool, DeleteFileTool, ReadTextFileTool, UpdateTextFileTool};
 use crate::tools::glob::SearchGlobFilesTool;
 use crate::tools::prompt::GetProjectAnalysisPromptTool;
+use crate::tools::search_content::SearchContentTool;
 use crate::tools::Tools;
 use anyhow::Result;
 use nixcode_llm_sdk::config::LLMConfig;
@@ -55,6 +56,8 @@ impl Nixcode {
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
                 tools.add_tool(Arc::new(UpdateTextFileTool {}));
                 tools.add_tool(Arc::new(DeleteFileTool {}));
+                tools.add_tool(Arc::new(SearchContentTool {}));
+
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));
                     tools.add_tool(Arc::new(GitCommitTool {}));

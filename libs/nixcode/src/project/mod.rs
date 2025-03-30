@@ -1,7 +1,7 @@
 use git2::Repository;
 use std::path::PathBuf;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Project {
     cwd: PathBuf,
     project_init_analysis_content: Option<String>,

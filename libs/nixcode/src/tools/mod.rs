@@ -7,6 +7,7 @@ pub mod fs;
 pub mod git;
 pub mod glob;
 pub mod prompt;
+pub mod search_content;
 
 #[async_trait]
 pub trait Tool {
