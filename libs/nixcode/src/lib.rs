@@ -77,7 +77,7 @@ impl Nixcode {
 
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));
-                    tools.add_tool(Arc::new(GitCommitTool {}));
+                    // tools.add_tool(Arc::new(GitCommitTool {}));
                     tools.add_tool(Arc::new(GitStatusTool {}));
                     tools.add_tool(Arc::new(GitDiffTool {}));
                     tools.add_tool(Arc::new(GitStashSaveTool {}));
