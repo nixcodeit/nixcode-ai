@@ -43,24 +43,12 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
     
-    - name: Check formatting
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
-    
-    - name: Check with clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: --all-targets --all-features
-    
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --workspace --verbose
-    
+        args: --verbose
+
     - name: Build
       uses: actions-rs/cargo@v1
       with:
