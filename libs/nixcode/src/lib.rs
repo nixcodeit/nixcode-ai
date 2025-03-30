@@ -15,6 +15,10 @@ use crate::tools::fs::update_text_file::UpdateTextFileTool;
 use crate::tools::git::git_add::GitAddTool;
 use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
+use crate::tools::git::git_stash_apply::GitStashApplyTool;
+use crate::tools::git::git_stash_drop::GitStashDropTool;
+use crate::tools::git::git_stash_list::GitStashListTool;
+use crate::tools::git::git_stash_save::GitStashSaveTool;
 use crate::tools::git::git_status::GitStatusTool;
 use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
 use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
@@ -72,6 +76,10 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitCommitTool {}));
                     tools.add_tool(Arc::new(GitStatusTool {}));
                     tools.add_tool(Arc::new(GitDiffTool {}));
+                    tools.add_tool(Arc::new(GitStashSaveTool {}));
+                    tools.add_tool(Arc::new(GitStashApplyTool {}));
+                    tools.add_tool(Arc::new(GitStashListTool {}));
+                    tools.add_tool(Arc::new(GitStashDropTool {}));
                 }
 
                 if !has_init_analysis {
