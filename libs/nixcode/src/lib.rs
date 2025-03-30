@@ -9,11 +9,12 @@ use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
 use crate::tools::fs::create_file::CreateFileTool;
 use crate::tools::fs::delete_file::DeleteFileTool;
-use crate::tools::fs::delete_text_file_partial::DeleteTextFilePartialTool;
 use crate::tools::fs::read_text_file::ReadTextFileTool;
-use crate::tools::fs::update_text_file_partial::UpdateTextFilePartialTool;
 use crate::tools::fs::write_text_file::WriteTextFileTool;
 use crate::tools::git::git_add::GitAddTool;
+use crate::tools::git::git_branch_create::GitBranchCreateTool;
+use crate::tools::git::git_branch_delete::GitBranchDeleteTool;
+use crate::tools::git::git_branches::GitBranchesTool;
 use crate::tools::git::git_diff::GitDiffTool;
 use crate::tools::git::git_log::GitLogTool;
 use crate::tools::git::git_stash_apply::GitStashApplyTool;
@@ -21,6 +22,8 @@ use crate::tools::git::git_stash_drop::GitStashDropTool;
 use crate::tools::git::git_stash_list::GitStashListTool;
 use crate::tools::git::git_stash_save::GitStashSaveTool;
 use crate::tools::git::git_status::GitStatusTool;
+use crate::tools::git::git_tag_create::GitTagCreateTool;
+use crate::tools::git::git_tags_list::GitTagsListTool;
 use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
 use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
 use crate::tools::search::replace_content::ReplaceContentTool;
@@ -68,9 +71,9 @@ impl Nixcode {
                 tools.add_tool(Arc::new(CreateFileTool {}));
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
                 tools.add_tool(Arc::new(WriteTextFileTool {}));
-                tools.add_tool(Arc::new(UpdateTextFilePartialTool {}));
+                // tools.add_tool(Arc::new(UpdateTextFilePartialTool {}));
                 tools.add_tool(Arc::new(DeleteFileTool {}));
-                tools.add_tool(Arc::new(DeleteTextFilePartialTool {}));
+                // tools.add_tool(Arc::new(DeleteTextFilePartialTool {}));
                 tools.add_tool(Arc::new(SearchContentTool {}));
                 tools.add_tool(Arc::new(ReplaceContentTool {}));
 
@@ -84,6 +87,11 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitStashListTool {}));
                     tools.add_tool(Arc::new(GitStashDropTool {}));
                     tools.add_tool(Arc::new(GitLogTool {}));
+                    tools.add_tool(Arc::new(GitBranchesTool {}));
+                    tools.add_tool(Arc::new(GitBranchCreateTool {}));
+                    tools.add_tool(Arc::new(GitBranchDeleteTool {}));
+                    tools.add_tool(Arc::new(GitTagCreateTool {}));
+                    tools.add_tool(Arc::new(GitTagsListTool {}));
                 }
 
                 if !has_init_analysis {

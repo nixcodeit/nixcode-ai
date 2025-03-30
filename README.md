@@ -121,19 +121,31 @@ The application uses vim-inspired input modes:
 
 ## Tools
 
-nixcode-ai includes a tool framework that allows the LLM to invoke functions. The tools provide capabilities for the LLM to interact with the local filesystem, search for files, work with Git repositories, and more.
+nixcode-ai includes a comprehensive tool framework that allows the LLM to invoke functions. These tools provide capabilities for the LLM to interact with the local filesystem, search for files, work with Git repositories, and more.
 
 ### File System Tools
 - **create_file**: Create an empty file at a specified path
 - **read_text_file**: Read the content of a text file
-- **update_text_file**: Update the content of a text file
+- **write_text_file**: Write content to a text file, overwriting existing content
 - **delete_file**: Delete a file at a specified path
+- **update_text_file_partial**: Update portions of a text file (partial updates)
+- **delete_text_file_partial**: Delete portions of a text file
 
 ### Git Tools
 - **git_add**: Track changes in git by adding files to the index
-- **git_commit**: Commit tracked changes with a message
 - **git_status**: Get the current git repository status
 - **git_diff**: Get the diff for a specific file
+- **git_commit**: Commit tracked changes with a message
+- **git_log**: View commit history between references
+- **git_branches**: Display git branches
+- **git_branch_create**: Create a new git branch
+- **git_branch_delete**: Delete a git branch
+- **git_stash_save**: Save changes in git stash
+- **git_stash_apply**: Apply changes from git stash
+- **git_stash_list**: List all stashes in git repository
+- **git_stash_drop**: Drop a stash from git stash list
+- **git_tag_create**: Create a git tag
+- **git_tags_list**: List git tags
 
 ### Search Tools
 - **search_glob_files**: Search for files in the project directory using glob patterns, with options to include gitignored and hidden files
@@ -150,6 +162,8 @@ These tools enable powerful use cases such as:
 - Version control operations
 - Project structure understanding
 - Text search and replace across multiple files
+- Branch and tag management
+- Stash operations for work-in-progress changes
 
 The tool system is designed to be extensible, making it easy to add new capabilities for the LLM to leverage.
 

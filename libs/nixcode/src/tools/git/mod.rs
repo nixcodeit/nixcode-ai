@@ -1,4 +1,7 @@
 pub mod git_add;
+pub mod git_branch_create;
+pub mod git_branch_delete;
+pub mod git_branches;
 pub mod git_commit;
 pub mod git_diff;
 pub mod git_log;
@@ -7,4 +10,6 @@ pub mod git_stash_drop;
 pub mod git_stash_list;
 pub mod git_stash_save;
 pub mod git_status;
+pub mod git_tag_create;
+pub mod git_tags_list;
 mod utils;
