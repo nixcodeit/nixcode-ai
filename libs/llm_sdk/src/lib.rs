@@ -60,6 +60,7 @@ pub struct Request {
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking: Option<ThinkingOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     tools: Option<Vec<Tool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<Vec<Content>>,

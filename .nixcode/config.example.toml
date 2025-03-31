@@ -1,0 +1,55 @@
+# Example nixcode-ai configuration file
+# Copy this to ~/.config/nixcode-ai/config.toml (global) or .nixcode/config.toml (project-specific)
+
+[llm]
+# Default LLM provider to use (anthropic/openai)
+default_provider = "anthropic"
+# Optional default model to use (overrides provider default)
+# default_model = "claude-3-7-sonnet-20250219"
+
+[providers.anthropic]
+# API key for Anthropic (or use ANTHROPIC_API_KEY environment variable)
+# api_key = "${ANTHROPIC_API_KEY}"
+# Default model for Anthropic
+default_model = "claude-3-7-sonnet-20250219"
+
+[providers.openai]
+# API key for OpenAI (or use OPENAI_API_KEY environment variable)
+# api_key = "${OPENAI_API_KEY}"
+# Default model for OpenAI
+default_model = "gpt-4o-mini"
+
+[tools]
+# Enable or disable all tools by default
+enabled = true
+
+# Override specific tools (true to enable, false to disable)
+[tools.overrides]
+# File system tools
+search_glob_files = true
+create_file = true
+read_text_file = true
+write_text_file = true
+delete_file = true
+
+# Content search and manipulation tools
+search_content = true
+replace_content = true
+
+# Git tools
+git_add = true
+git_status = true
+git_diff = true
+git_stash_save = true
+git_stash_apply = true
+git_stash_list = true
+git_stash_drop = true
+git_log = true
+git_branches = true
+git_branch_create = true
+git_branch_delete = true
+git_tag_create = true
+git_tags_list = true
+
+# Special tools
+get_project_analysis_prompt = true

@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::project::Project;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -24,7 +25,7 @@ pub type SafeTool = Arc<dyn Tool + Send + Sync>;
 
 #[derive(Default, Clone)]
 pub struct Tools {
-    hashmap: HashMap<String, SafeTool>,
+    pub(crate) hashmap: HashMap<String, SafeTool>,
 }
 
 impl Tools {
@@ -50,6 +51,20 @@ impl Tools {
         self.hashmap
             .values()
             .map(|tool| tool.get_schema())
+            .collect()
+    }
+
+    /// Get all tools that are enabled based on configuration
+    pub fn get_enabled_tools(&self, config: &Config) -> Vec<nixcode_llm_sdk::tools::Tool> {
+        self.hashmap
+            .iter()
+            .filter_map(|(name, tool)| {
+                if config.is_tool_enabled(name) {
+                    Some(tool.get_schema())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 

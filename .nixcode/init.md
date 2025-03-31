@@ -76,6 +76,17 @@ The project implements several tools in the `libs/nixcode/src/tools/` directory:
 
 All tools implement the `Tool` trait defined in `tools/mod.rs`, which provides a standardized interface for tool registration, schema definition, and execution.
 
+#### Tool Configuration
+The tool system supports configurable tool availability through user configuration files. Users can:
+- Enable or disable all tools by default using the `tools.enabled` setting
+- Override specific tools individually using `tools.overrides.<tool_name>` settings
+
+Configuration can be applied at two levels:
+1. **Global**: `~/.config/nixcode-ai/config.toml` for user-wide settings
+2. **Project**: `.nixcode/config.toml` within a project for project-specific settings
+
+An example configuration file is available at `.nixcode/config.example.toml`.
+
 ## Workflow
 
 1. **User Input Flow**:
@@ -91,7 +102,7 @@ All tools implement the `Tool` trait defined in `tools/mod.rs`, which provides a
 
 3. **Tool Execution Flow**:
    - LLM response may include tool invocation requests
-   - Tool requests are identified and executed
+   - Tool requests are identified and executed based on configuration
    - Results are sent back to the LLM
    - Conversation continues with tool output context
 
@@ -147,6 +158,32 @@ The project follows the Angular Commit Convention for consistent and descriptive
 - Streaming responses from LLM
 - Tool invocation via standardized interfaces
 
+## Configuration System
+
+The project uses a layered configuration system:
+
+1. **Default configuration**: Hard-coded defaults in the code
+2. **Global configuration**: `~/.config/nixcode-ai/config.toml` for user-wide settings
+3. **Project configuration**: `.nixcode/config.toml` for project-specific settings
+
+Configuration categories include:
+- **LLM settings**: Default provider, models
+- **Provider settings**: API keys and provider-specific options
+- **Tool availability**: Control which tools are available to the LLM
+
+To customize tool availability, users can create a config file with a `[tools]` section:
+
+```toml
+[tools]
+# Enable or disable all tools by default
+enabled = true
+
+# Override specific tools
+[tools.overrides]
+git_add = false         # disable git_add tool
+read_text_file = true   # explicitly enable read_text_file
+```
+
 ## Recommendations
 
 1. **Understanding the Tool System**: The tool system is a key component for AI function-calling. Understanding the interaction between `libs/nixcode/src/tools/` and `libs/llm_sdk/src/message/content/tools.rs` is crucial.
@@ -159,11 +196,13 @@ The project follows the Angular Commit Convention for consistent and descriptive
 
 5. **Authentication**: Note that the app requires an Anthropic API key set as `ANTHROPIC_API_KEY` in the environment.
 
-6. **Adding Features**: When adding new functionality, follow the existing modular patterns:
+6. **Configuration System**: When adding new features, consider whether they should be configurable through the config system. Add appropriate documentation and ensure sensible defaults.
+
+7. **Adding Features**: When adding new functionality, follow the existing modular patterns:
    - For new tools, add to `libs/nixcode/src/tools/`
    - For UI components, extend `apps/nixcode-cli/src/widgets/`
    - For LLM provider integrations, update `libs/llm_sdk/src/providers.rs`
 
-7. **Testing**: The codebase includes some test patterns in the tools modules that can be followed for adding new tests.
+8. **Testing**: The codebase includes some test patterns in the tools modules that can be followed for adding new tests.
 
-8. **Documentation Maintenance**: When adding, modifying, or removing features that affect the project structure (new tools, UI components, libraries, etc.), update this analysis document (`.nixcode/init.md`) to ensure it remains accurate and useful for new developers. Outdated documentation can lead to confusion and slower onboarding.
+9. **Documentation Maintenance**: When adding, modifying, or removing features that affect the project structure (new tools, UI components, libraries, etc.), update this analysis document (`.nixcode/init.md`) to ensure it remains accurate and useful for new developers. Outdated documentation can lead to confusion and slower onboarding.

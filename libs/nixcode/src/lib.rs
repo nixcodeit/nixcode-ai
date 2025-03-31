@@ -15,6 +15,7 @@ use crate::tools::git::git_add::GitAddTool;
 use crate::tools::git::git_branch_create::GitBranchCreateTool;
 use crate::tools::git::git_branch_delete::GitBranchDeleteTool;
 use crate::tools::git::git_branches::GitBranchesTool;
+use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
 use crate::tools::git::git_log::GitLogTool;
 use crate::tools::git::git_stash_apply::GitStashApplyTool;
@@ -50,11 +51,7 @@ pub struct Nixcode {
 }
 
 impl Nixcode {
-    pub fn new(
-        project: Project,
-        client: LLMClient,
-        config: Config,
-    ) -> anyhow::Result<Self, LLMError> {
+    pub fn new(project: Project, client: LLMClient, config: Config) -> Result<Self, LLMError> {
         let has_init_analysis = project.has_init_analysis();
         let model = config.get_model_for_provider(&config.llm.default_provider);
         let has_repo_path = project.has_repo_path();
@@ -63,10 +60,11 @@ impl Nixcode {
             project: Arc::new(project),
             client,
             model,
-            config,
+            config: config.clone(),
             tools: {
                 let mut tools = Tools::new();
 
+                // Register all tools unconditionally
                 tools.add_tool(Arc::new(SearchGlobFilesTool {}));
                 tools.add_tool(Arc::new(CreateFileTool {}));
                 tools.add_tool(Arc::new(ReadTextFileTool {}));
@@ -79,7 +77,7 @@ impl Nixcode {
 
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));
-                    // tools.add_tool(Arc::new(GitCommitTool {}));
+                    tools.add_tool(Arc::new(GitCommitTool {}));
                     tools.add_tool(Arc::new(GitStatusTool {}));
                     tools.add_tool(Arc::new(GitDiffTool {}));
                     tools.add_tool(Arc::new(GitStashSaveTool {}));
@@ -178,8 +176,10 @@ impl Nixcode {
             // .with_thinking(ThinkingOptions::new(8192))
             .with_cache();
 
-        if !self.tools.is_empty() {
-            request = request.with_tools(self.tools.get_all_tools());
+        // Use enabled_tools instead of all tools
+        let enabled_tools = self.tools.get_enabled_tools(&self.config);
+        if !enabled_tools.is_empty() {
+            request = request.with_tools(enabled_tools);
         }
 
         let mut stream = self.client.send(request).await?;
@@ -200,6 +200,13 @@ impl Nixcode {
         name: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value> {
+        if !self.config.is_tool_enabled(name) {
+            return Err(anyhow::anyhow!(
+                "Tool '{}' is disabled in configuration",
+                name
+            ));
+        }
+
         self.tools
             .execute_tool(name, params, self.project.clone())
             .await

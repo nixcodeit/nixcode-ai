@@ -2,6 +2,7 @@ use anyhow::Result;
 use directories::ProjectDirs;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,10 @@ pub struct Config {
     /// Provider-specific settings
     #[serde(default)]
     pub providers: Providers,
+
+    /// Tool configuration
+    #[serde(default)]
+    pub tools: ToolsConfig,
 }
 
 /// LLM general settings
@@ -61,6 +66,22 @@ pub struct ProviderSettings {
     pub default_model: Option<String>,
 }
 
+/// Tool configuration
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ToolsConfig {
+    /// Enable all tools by default
+    #[serde(default = "default_tools_enabled")]
+    pub enabled: bool,
+
+    /// Override specific tools (true to enable, false to disable)
+    #[serde(default)]
+    pub overrides: HashMap<String, bool>,
+}
+
+fn default_tools_enabled() -> bool {
+    true
+}
+
 impl Config {
     /// Create a new default configuration
     pub fn new() -> Self {
@@ -76,6 +97,7 @@ impl Config {
                     ..Default::default()
                 },
             },
+            tools: ToolsConfig::default(),
         }
     }
 
@@ -157,6 +179,36 @@ impl Config {
         };
 
         Ok(SecretString::new(key_value.into()))
+    }
+
+    /// Check if a tool is enabled based on configuration
+    pub fn is_tool_enabled(&self, tool_name: &str) -> bool {
+        // First check if we have a specific override for this tool
+        if let Some(enabled) = self.tools.overrides.get(tool_name) {
+            return *enabled;
+        }
+
+        // If not, use the global setting
+        self.tools.enabled
+    }
+}
+
+impl ToolsConfig {
+    /// Get a list of all enabled tool names based on current configuration and available tools
+    pub fn get_enabled_tools(&self, all_tools: &[String]) -> Vec<String> {
+        all_tools
+            .iter()
+            .filter(|tool_name| {
+                // If we have a specific override for this tool, use that
+                if let Some(enabled) = self.overrides.get(*tool_name) {
+                    *enabled
+                } else {
+                    // Otherwise use the global setting
+                    self.enabled
+                }
+            })
+            .cloned()
+            .collect()
     }
 }
 
