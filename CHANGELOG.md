@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.3.1](https://github.com/nixcodeit/nixcode-ai/compare/v0.3.0...HEAD)
+## [v0.3.1](https://github.com/nixcodeit/nixcode-ai/compare/v0.3.0...v0.3.1)
 
 ### New Features
 - Added new git log tool allowing AI to view commit history between references ([e1c8e8d](https://github.com/nixcodeit/nixcode-ai/commit/e1c8e8d)) [@nixuuu](https://github.com/nixuuu)
