@@ -253,15 +253,14 @@ impl Nixcode {
             async move {
                 while let Some(event) = stream.recv().await {
                     x.handle_response_event(event.clone()).await;
-                    nixcode_event_sender
-                        .send(NixcodeEvent::MessageChunk(event))
-                        .ok();
                 }
 
                 *self.is_waiting.write().await = false;
                 nixcode_event_sender
                     .send(NixcodeEvent::GeneratedResponse)
                     .ok();
+
+                x.execute_tools().await;
             }
         });
     }
@@ -362,28 +361,36 @@ impl Nixcode {
         let mut usage = self.usage.write().await;
         let last_message = messages.last_mut().unwrap();
         let last_response = last_message_response.as_mut().unwrap();
+        let mut message_updated = false;
         match message {
             MessageResponseStreamEvent::MessageStart(msg) => {
                 *last_response += msg;
                 *usage += last_response.usage.clone();
+                message_updated = true;
             }
             MessageResponseStreamEvent::MessageDelta(delta) => {
                 usage.output_tokens += delta.get_usage().output_tokens;
                 *last_response += delta;
+                message_updated = true;
             }
             MessageResponseStreamEvent::ContentBlockStart(content) => {
                 *last_response += content;
+                message_updated = true;
             }
             MessageResponseStreamEvent::ContentBlockDelta(delta) => {
+                let index = delta.get_index();
                 *last_response += delta;
+
+                match last_response.get_content(index) {
+                    Content::ToolUse(_) => (),
+                    _ => { message_updated = true; },
+                }
             }
             MessageResponseStreamEvent::ContentBlockStop(content) => {
                 if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
                     self.clone().add_tool_to_execute(tool_use).await;
                 }
-            }
-            MessageResponseStreamEvent::MessageStop => {
-                self.clone().execute_tools().await;
+                message_updated = true;
             }
             MessageResponseStreamEvent::Error { error } => {
                 *self.llm_error.write().await = Some(error.clone());
@@ -391,11 +398,19 @@ impl Nixcode {
             _ => (),
         }
 
+        if message_updated {
+            self.tx.send(NixcodeEvent::MessageUpdated).ok();
+        }
+
         last_message.set_content(last_response.content.clone());
     }
 
     async fn execute_tools(self: &Arc<Self>) {
         let tools = self.get_tools_to_execute().await;
+
+        if tools.is_empty() {
+            return;
+        }
 
         for tool in tools {
             tokio::spawn({
@@ -466,7 +481,6 @@ impl Nixcode {
 
     pub async fn add_tool_to_execute(self: &Arc<Self>, content: ToolUseContent) {
         self.tools_to_execute.write().await.push(content.clone());
-        self.tx.send(NixcodeEvent::ToolAddToExecute(content)).ok();
     }
 
     pub async fn start_tool(self: &Arc<Self>, tool: ToolUseContent) {
