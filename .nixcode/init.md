@@ -10,19 +10,21 @@ The project follows a modular architecture organized as a Rust workspace with mu
 
 1. **Main Application (apps/nixcode-cli)**: The terminal interface and user interaction layer
 2. **LLM SDK Library (libs/llm_sdk)**: API client for LLM providers (currently Anthropic, with plans for OpenAI, etc.)
-3. **Core Library (libs/nixcode)**: Core functionality including tools and utilities
+3. **Core Library (libs/nixcode)**: Core functionality including tools, utilities and event management
 4. **Procedural Macros (libs/nixcode-macros)**: Custom macros for the project
 
 The application follows an event-driven architecture where:
 - UI events are captured and processed by the main app
-- Commands and messages flow through an event channel system
+- Commands and messages flow through a standardized event system
+- The `NixcodeEvent` enum defines standard events for communication between components
+- State management is centralized in the Nixcode component
 - Async tasks handle LLM communication
 - Tool invocations are processed in a dedicated system
 
 ### Communication Flow
 
-1. User input → App → LLM SDK → LLM Provider (Anthropic)
-2. LLM Response → SDK → App → UI
+1. User input → App → Nixcode → LLM SDK → LLM Provider (Anthropic)
+2. LLM Response → SDK → Nixcode → Events → App → UI
 3. Tool invocations: LLM Request → Tool Execution → Results → LLM
 
 ## Key Components
@@ -47,6 +49,7 @@ The application follows an event-driven architecture where:
 - **tools.rs**: Tool definition system for LLM function calling
 
 #### nixcode (Core Utilities)
+- **events/**: Event system definitions and handling for component communication
 - **tools/**: Tool implementation (filesystem operations, glob search, git, etc.)
 - **project/**: Project management functionality
 - **prompts/**: System prompts and templates
@@ -92,17 +95,20 @@ An example configuration file is available at `.nixcode/config.example.toml`.
 1. **User Input Flow**:
    - User types in the terminal interface
    - Input is processed based on the current input mode (Normal, Insert, Command)
-   - Commands are executed or messages are sent to the LLM
+   - Commands are executed or messages are sent to the Nixcode component
 
 2. **LLM Interaction Flow**:
    - Messages are sent to the LLM via the Anthropic API
-   - Responses are streamed back and displayed progressively
-   - Events are dispatched through the app event channel
+   - Responses are streamed back via the event system
+   - Events are dispatched through the standardized event channels
+   - State changes are managed by the Nixcode component
+   - UI updates in response to events
    - Input costs are tracked and displayed
 
 3. **Tool Execution Flow**:
    - LLM response may include tool invocation requests
    - Tool requests are identified and executed based on configuration
+   - Tool execution status is communicated via events
    - Results are sent back to the LLM
    - Conversation continues with tool output context
 
@@ -153,7 +159,8 @@ The project follows the Angular Commit Convention for consistent and descriptive
 - This convention helps with automated changelog generation and versioning
 
 ### Data Flow Patterns
-- Message-passing between components
+- Centralized state management in Nixcode component
+- Message-passing between components using typed events
 - Event channels for async communication
 - Streaming responses from LLM
 - Tool invocation via standardized interfaces
@@ -186,23 +193,26 @@ read_text_file = true   # explicitly enable read_text_file
 
 ## Recommendations
 
-1. **Understanding the Tool System**: The tool system is a key component for AI function-calling. Understanding the interaction between `libs/nixcode/src/tools/` and `libs/llm_sdk/src/message/content/tools.rs` is crucial.
+1. **Understanding the Event System**: The new event system is a key architectural component. Understanding the interaction between `libs/nixcode/src/events/mod.rs` and how it's used in `libs/nixcode/src/lib.rs` is crucial for working with the codebase.
 
-2. **Event Flow**: The app uses an event-based system with `AppEvent` enums and channels. Understanding this flow helps with making modifications.
+2. **State Management**: State is now centralized in the Nixcode component rather than distributed across UI components. Understand how `RwLock<T>` is used for thread-safe state management.
 
-3. **UI Rendering**: The TUI rendering in `apps/nixcode-cli/src/widgets/` follows ratatui patterns with careful state management for scrolling and layout.
+3. **Event Flow**: The app uses a standardized event system with `NixcodeEvent` enums and channels for communication between components. Understanding this flow helps with making modifications.
 
-4. **LLM Integration**: Study `libs/llm_sdk/src/lib.rs` to understand how the application communicates with LLM providers, especially for streaming responses.
+4. **UI Rendering**: The TUI rendering in `apps/nixcode-cli/src/widgets/` follows ratatui patterns with careful state management for scrolling and layout.
 
-5. **Authentication**: Note that the app requires an Anthropic API key set as `ANTHROPIC_API_KEY` in the environment.
+5. **LLM Integration**: Study `libs/llm_sdk/src/lib.rs` to understand how the application communicates with LLM providers, especially for streaming responses.
 
-6. **Configuration System**: When adding new features, consider whether they should be configurable through the config system. Add appropriate documentation and ensure sensible defaults.
+6. **Authentication**: Note that the app requires an Anthropic API key set as `ANTHROPIC_API_KEY` in the environment.
 
-7. **Adding Features**: When adding new functionality, follow the existing modular patterns:
+7. **Configuration System**: When adding new features, consider whether they should be configurable through the config system. Add appropriate documentation and ensure sensible defaults.
+
+8. **Adding Features**: When adding new functionality, follow the existing modular patterns:
    - For new tools, add to `libs/nixcode/src/tools/`
    - For UI components, extend `apps/nixcode-cli/src/widgets/`
    - For LLM provider integrations, update `libs/llm_sdk/src/providers.rs`
+   - For new events, extend the `NixcodeEvent` enum in `libs/nixcode/src/events/mod.rs`
 
-8. **Testing**: The codebase includes some test patterns in the tools modules that can be followed for adding new tests.
+9. **Testing**: The codebase includes some test patterns in the tools modules that can be followed for adding new tests.
 
-9. **Documentation Maintenance**: When adding, modifying, or removing features that affect the project structure (new tools, UI components, libraries, etc.), update this analysis document (`.nixcode/init.md`) to ensure it remains accurate and useful for new developers. Outdated documentation can lead to confusion and slower onboarding.
+10. **Documentation Maintenance**: When adding, modifying, or removing features that affect the project structure (new tools, UI components, libraries, etc.), update this analysis document (`.nixcode/init.md`) to ensure it remains accurate and useful for new developers. Outdated documentation can lead to confusion and slower onboarding.

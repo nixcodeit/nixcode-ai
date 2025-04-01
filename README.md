@@ -26,6 +26,7 @@ AI assistance right in your terminal.
 - Tool invocation framework allowing AI to use external tools
 - Command popup for executing special commands
 - Configurable via external TOML configuration files
+- Event-driven architecture for responsive UI
 
 ## Todos
 
@@ -67,7 +68,7 @@ cargo run --release
 
 nixcode-ai can be configured using TOML configuration files. Configuration is read (if present) from:
 
-1. User-level config: `~/.config/nixcode/config.toml` (Unix) or `%APPDATA%\nixcode\config.toml` (Windows)
+1. User-level config: `~/.config/nixcode-ai/config.toml` (Unix) or `%APPDATA%\nixcode-ai\config.toml` (Windows)
 2. Project-specific config: `.nixcode/config.toml` in the current project directory
 
 A sample configuration template is provided at `config.toml.example`. You can copy this to the appropriate location to
@@ -99,7 +100,7 @@ The project is organized as a Rust workspace with the following components:
 
 - `apps/nixcode-cli`: The main CLI application
 - `libs/llm_sdk`: SDK for interacting with LLM providers
-- `libs/nixcode`: Core library with tools and utilities
+- `libs/nixcode`: Core library with tools, utilities, and event system
 - `libs/nixcode-macros`: Procedural macros for the project
 
 ## Usage
