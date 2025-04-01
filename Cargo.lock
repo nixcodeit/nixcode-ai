@@ -1170,7 +1170,7 @@ dependencies = [
 
 [[package]]
 name = "nixcode-cli"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",

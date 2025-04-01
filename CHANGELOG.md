@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.4.0](https://github.com/nixcodeit/nixcode-ai/compare/v0.3.1...v0.4.0)
+
+### 🚀 New Features
+- ✨ Added tool configuration system - now you can control which tools are available via config file! ([e680965](https://github.com/nixcodeit/nixcode-ai/commit/e680965)) [@nixuuu](https://github.com/nixuuu)
+- 🌿 Enhanced Git superpowers with branch and tag management ([781e4f8](https://github.com/nixcodeit/nixcode-ai/commit/781e4f8)) [@nixuuu](https://github.com/nixuuu)
+  - 🔀 Branch creation and deletion
+  - 🔍 Branch listing functionality 
+  - 🏷️ Tag creation and management
+  - 📋 Tag listing capabilities
+
+### 🏗️ Architecture Improvements
+- 🔄 Completely new event-driven architecture ([5be5ef7](https://github.com/nixcodeit/nixcode-ai/commit/5be5ef7)) [@nixuuu](https://github.com/nixuuu)
+  - 📦 Centralized state management
+  - 📨 Standardized event system for better component communication
+  - 🧩 Improved async patterns throughout codebase
+  - 🛠️ Simplified UI components by removing duplicated state
+
+### 🐞 Bug Fixes
+- 🔓 Removed deadlock in event processing ([893d1d4](https://github.com/nixcodeit/nixcode-ai/commit/893d1d4)) [@nixuuu](https://github.com/nixuuu)
+
+### ⚡ Performance
+- 🚄 Optimized events sending for smoother experience ([b9e1f8a](https://github.com/nixcodeit/nixcode-ai/commit/b9e1f8a)) [@nixuuu](https://github.com/nixuuu)
+
+### 📚 Documentation
+- 📖 Updated project documentation to reflect new event-driven architecture ([bae9aa2](https://github.com/nixcodeit/nixcode-ai/commit/bae9aa2)) [@nixuuu](https://github.com/nixuuu)
+- 🔗 Fixed CHANGELOG.md links ([5f8c8f3](https://github.com/nixcodeit/nixcode-ai/commit/5f8c8f3)) [@nixuuu](https://github.com/nixuuu)
+
 ## [v0.3.1](https://github.com/nixcodeit/nixcode-ai/compare/v0.3.0...v0.3.1)
 
 ### New Features

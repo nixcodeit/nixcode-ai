@@ -3,7 +3,7 @@
 [![Rust Build & Test](https://github.com/nixcodeit/nixcode-ai/actions/workflows/rust-build.yml/badge.svg)](https://github.com/nixcodeit/nixcode-ai/actions/workflows/rust-build.yml)
 [![License: Custom](https://img.shields.io/badge/License-Custom-blue.svg)](LICENSE.md)
 [![Rust Version: 1.76+](https://img.shields.io/badge/Rust-1.76+-orange.svg)](https://www.rust-lang.org/)
-[![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-green.svg)](https://github.com/nixcodeit/nixcode-ai)
+[![Version: 0.4.0](https://img.shields.io/badge/Version-0.4.0-green.svg)](https://github.com/nixcodeit/nixcode-ai)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/nixcodeit/nixcode-ai/pulls)
 [![Made with Rust](https://img.shields.io/badge/Made%20with-Rust-red.svg)](https://www.rust-lang.org/)
 [![Terminal Application](https://img.shields.io/badge/Terminal-Application-black.svg)](https://github.com/nixcodeit/nixcode-ai)
