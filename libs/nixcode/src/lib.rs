@@ -229,6 +229,7 @@ impl Nixcode {
         let nixcode_event_sender = self.tx.clone();
 
         *self.is_waiting.write().await = true;
+        *self.llm_error.write().await = None;
 
         nixcode_event_sender
             .send(NixcodeEvent::GeneratingResponse)
@@ -448,6 +449,7 @@ impl Nixcode {
         self.tools_to_execute.write().await.clear();
         self.messages.write().await.clear();
         *self.usage.write().await = Usage::default();
+        *self.llm_error.write().await = None;
 
         Ok(())
     }
