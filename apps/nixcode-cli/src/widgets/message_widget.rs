@@ -1,3 +1,4 @@
+use crate::utils::highlights::highlight_code;
 use nixcode_llm_sdk::message::content::tools::ToolUseState;
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
@@ -19,7 +20,7 @@ impl MessageWidget {
 
         for (key, value) in obj {
             let formatted_value = match value {
-                Value::String(s) if s.len() > 50 => "[long content]".to_string(),
+                Value::String(s) if s.len() > 100 || s.contains("\n") => "[long content]".to_string(),
                 Value::String(s) => serde_json::to_string(s).unwrap_or(format!("\"{}\"", s)),
                 Value::Number(n) => n.to_string(),
                 Value::Bool(b) => b.to_string(),
@@ -53,9 +54,24 @@ impl MessageWidget {
                     ]
                 }
                 Content::Text(text) => {
+                    let text = text.get_text();
+                    let parsed_text = highlight_code(text.clone(), "md");
+
+                    if let Ok(mut t) = parsed_text {
+                        if t.len() > 0 {
+                            let first_lane = t.get_mut(0).unwrap();
+                            let mut spans = vec![author.clone()];
+                            spans.extend(first_lane.clone().spans);
+                            *first_lane = Line::from(spans);
+                        }
+
+                        t.push(Line::from(vec![]));
+
+                        return t;
+                    }
+
                     let mut lines: Vec<Line> = vec![];
                     let x: Vec<String> = text
-                        .get_text()
                         .split("\n")
                         .map(|x| x.trim_end().to_string())
                         .collect();

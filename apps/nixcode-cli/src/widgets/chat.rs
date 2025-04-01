@@ -115,7 +115,7 @@ impl Chat {
             lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
         }
 
-        self.paragraph = Paragraph::new(lines.clone()).wrap(Wrap { trim: true });
+        self.paragraph = Paragraph::new(lines.clone()).wrap(Wrap { trim: false });
 
         // Calculate the total line count based on the content and area width
         let total_lines = if self.area_size.0 > 0 {

@@ -1,9 +1,10 @@
 use crate::app::AppEvent;
 use crate::user_input::UserSingleLineInput;
+use crate::utils::highlights::THEME;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Margin, Rect};
-use ratatui::prelude::{Color, Modifier, Style, Widget};
+use ratatui::prelude::{Color, Modifier, Style, Stylize, Widget};
 use ratatui::widgets::{Block, BorderType, Borders, Clear};
 
 /// Information about a command and its aliases
@@ -314,11 +315,20 @@ impl Widget for &CommandPopup {
         };
 
         // Render the input block
-        let input_block = Block::bordered()
+        let mut input_block = Block::bordered()
             .title(title)
             .title_style(title_style)
             .border_type(BorderType::Rounded)
             .borders(Borders::ALL);
+
+        if let Some(bg) = THEME.settings.background {
+            let c = Color::Rgb(
+                bg.r,
+                bg.g,
+                bg.b,
+            );
+            input_block = input_block.bg(c);
+        }
 
         input_block.render(popup_area, buf);
 

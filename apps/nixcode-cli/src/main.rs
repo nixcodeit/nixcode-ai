@@ -12,6 +12,7 @@ mod popup_utils;
 mod status_bar;
 mod user_input;
 mod widgets;
+mod utils;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
