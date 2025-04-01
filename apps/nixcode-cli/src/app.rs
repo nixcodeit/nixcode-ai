@@ -3,10 +3,9 @@ use crate::input_mode::InputMode;
 use crate::widgets::chat::Chat;
 use anyhow::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
-use nixcode::Nixcode;
-use nixcode_llm_sdk::errors::llm::LLMError;
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
-use nixcode_llm_sdk::MessageResponseStreamEvent;
+use nixcode::events::NixcodeEvent;
+use nixcode::{NewNixcodeResult, Nixcode};
+use nixcode_llm_sdk::ErrorContent;
 use ratatui::prelude::{Modifier, Stylize};
 use ratatui::widgets::Block;
 use ratatui::{DefaultTerminal, Frame};
@@ -17,24 +16,17 @@ use tokio_stream::StreamExt;
 pub enum AppEvent {
     SetInputMode(InputMode),
     Command(String),
-    ChatGeneratingResponse,
-    ChatGeneratedResponse,
-    ChatError(LLMError),
-    ChatChunk(MessageResponseStreamEvent),
-    ExecuteTools,
-    ToolAddToExecute(ToolUseContent),
-    ToolStart(ToolUseContent),
-    ToolEnd(ToolResultContent),
+    UpdateChatWidgets,
     RetryLastMessage,
     RemoveLastMessage,
     ClearChat,
     Quit,
     Render,
+    ChatError(ErrorContent),
 }
 
 enum AppView {
     Chat,
-    Settings,
 }
 
 pub struct App {
@@ -47,16 +39,20 @@ pub struct App {
     rx: tokio::sync::mpsc::UnboundedReceiver<AppEvent>,
     tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
 
+    nixcode_rx: tokio::sync::mpsc::UnboundedReceiver<NixcodeEvent>,
+    nixcode: Arc<Nixcode>,
+
     command_popup: CommandPopup,
 }
 
 impl App {
-    pub(crate) fn new(nixcode: Nixcode) -> Result<Self> {
+    pub(crate) fn new(nixcode: NewNixcodeResult) -> Result<Self> {
         let input_mode = InputMode::Normal;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
-        let nixcode = Arc::new(nixcode);
-        let chat = Chat::new(nixcode, input_mode, tx.clone());
+        let (nixcode_rx, client) = nixcode;
+        let nixcode = Arc::new(client);
+        let chat = Chat::new(nixcode.clone(), input_mode, tx.clone());
 
         Ok(App {
             input_mode,
@@ -64,8 +60,10 @@ impl App {
             current_view: AppView::Chat,
             command_popup: CommandPopup::new(tx.clone()),
             chat_view: chat,
+            nixcode,
             rx,
             tx,
+            nixcode_rx,
         })
     }
 
@@ -140,10 +138,29 @@ impl App {
                 Some(Ok(event)) = events.next() => {
                     self.handle_input_events(event).await;
                 },
+                Some(nixcode_event) = self.nixcode_rx.recv() => {
+                    self.handle_nixcode_event(nixcode_event).await;
+                }
             }
         }
 
         Ok(())
+    }
+
+    async fn handle_nixcode_event(&mut self, event: NixcodeEvent) {
+        match event {
+            NixcodeEvent::ToolsFinished => {
+                let nixcode = self.nixcode.clone();
+                tokio::spawn(async move {
+                    nixcode.send_tools_results().await;
+                });
+                self.chat_view.update_chat_widgets().await;
+            }
+            NixcodeEvent::Error(error) => {
+                self.tx.send(AppEvent::ChatError(error.into())).ok();
+            }
+            _ => self.chat_view.update_chat_widgets().await,
+        }
     }
 
     async fn handle_app_event(&mut self, event: AppEvent) {
@@ -151,18 +168,12 @@ impl App {
             AppEvent::SetInputMode(mode) => self.set_input_mode(mode),
             AppEvent::Command(command) => self.execute_command(command).await,
             AppEvent::Quit => self.quit(),
-            AppEvent::ChatGeneratingResponse => self.chat_view.waiting_for_response(),
-            AppEvent::ChatGeneratedResponse => self.chat_view.generated_response(),
-            AppEvent::ChatError(err) => self.chat_view.handle_llm_error(err),
-            AppEvent::ChatChunk(chunk) => self.chat_view.handle_message_chunk(chunk),
-            AppEvent::ToolStart(content) => self.chat_view.start_tool(content),
-            AppEvent::ToolAddToExecute(content) => self.chat_view.add_tool_to_execute(content),
-            AppEvent::ToolEnd(content) => self.chat_view.tool_finished(content).await,
-            AppEvent::ExecuteTools => self.chat_view.execute_tools(),
+            AppEvent::UpdateChatWidgets => self.chat_view.update_chat_widgets().await,
             AppEvent::Render => (),
             AppEvent::RetryLastMessage => self.chat_view.retry_last_message().await,
-            AppEvent::ClearChat => self.chat_view.clear_chat(),
-            AppEvent::RemoveLastMessage => self.chat_view.remove_last_message(),
+            AppEvent::ClearChat => self.chat_view.clear_chat().await,
+            AppEvent::RemoveLastMessage => self.chat_view.remove_last_message().await,
+            AppEvent::ChatError(error) => self.chat_view.on_error(error).await,
         }
     }
 
@@ -182,7 +193,6 @@ impl App {
 
         match self.current_view {
             AppView::Chat => self.chat_view.render_frame(frame, main_area),
-            _ => todo!(),
         }
 
         frame.render_widget(StatusBar::new(self.input_mode), status_area);
@@ -215,7 +225,7 @@ impl App {
             "retry" => {
                 self.tx.send(AppEvent::RetryLastMessage).ok();
             }
-            "remove-last-message" => self.chat_view.remove_last_message(),
+            "remove-last-message" => self.chat_view.remove_last_message().await,
             _ => panic!("Command not implemented: {}", command),
         }
 
@@ -224,10 +234,6 @@ impl App {
 
     fn quit(&mut self) {
         self.should_quit = true;
-    }
-
-    fn show_settings(&mut self) {
-        self.current_view = AppView::Settings;
     }
 
     fn show_chat_view(&mut self) {

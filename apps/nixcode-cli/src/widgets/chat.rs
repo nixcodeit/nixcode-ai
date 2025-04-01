@@ -4,14 +4,11 @@ use crate::user_input::UserSingleLineInput;
 use crate::widgets::message_widget::MessageWidget;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use nixcode::Nixcode;
-use nixcode_llm_sdk::errors::llm::LLMError;
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
-use nixcode_llm_sdk::message::message::Message::{Assistant, User};
-use nixcode_llm_sdk::message::response::MessageResponse;
+use nixcode_llm_sdk::message::message::Message::User;
 use nixcode_llm_sdk::message::usage::Usage;
-use nixcode_llm_sdk::{ErrorContent, MessageResponseStreamEvent};
+use nixcode_llm_sdk::ErrorContent;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -24,23 +21,19 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Chat {
     vertical_scroll_state: ScrollbarState,
-    messages: Vec<Message>,
     lines: Vec<Line<'static>>,
     paragraph: Paragraph<'static>,
     client: Arc<Nixcode>,
     input_mode: InputMode,
     app_event: UnboundedSender<AppEvent>,
-    last_message_response: Option<MessageResponse>,
-    tools_to_execute: Vec<ToolUseContent>,
-    tools_results: Vec<ToolResultContent>,
     prompt: UserSingleLineInput,
-    waiting: bool,
     area_size: (u16, u16), // (width, height)
     stick_to_bottom: bool,
     scroll: usize,      // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
-    llm_error: Option<ErrorContent>,
     usage: Usage,
+    waiting: bool,
+    error: Option<ErrorContent>,
 }
 
 impl Chat {
@@ -55,19 +48,15 @@ impl Chat {
             input_mode,
             app_event,
             prompt: Default::default(),
-            messages: Vec::new(),
             scroll: 0,
-            waiting: false,
             lines: Vec::new(),
             paragraph: Paragraph::new(Vec::new()),
             stick_to_bottom: true,
             area_size: (0, 0),
-            last_message_response: None,
-            tools_results: vec![],
-            tools_to_execute: vec![],
             total_lines: 0,
             usage: Usage::default(),
-            llm_error: None,
+            waiting: false,
+            error: None,
         }
     }
 
@@ -110,58 +99,19 @@ impl Chat {
         }
     }
 
-    pub fn add_chunk(&mut self, message: MessageResponseStreamEvent) {
-        if self.last_message_response.is_none() || self.messages.last().is_none() {
-            return;
-        }
-
-        let last_message = self.messages.last_mut().unwrap();
-        let last_response = self.last_message_response.as_mut().unwrap();
-        match message {
-            MessageResponseStreamEvent::MessageStart(msg) => {
-                *last_response += msg;
-                self.usage += last_response.usage.clone();
-            }
-            MessageResponseStreamEvent::MessageDelta(delta) => {
-                self.usage.output_tokens += delta.get_usage().output_tokens;
-                *last_response += delta;
-            }
-            MessageResponseStreamEvent::ContentBlockStart(content) => {
-                *last_response += content;
-            }
-            MessageResponseStreamEvent::ContentBlockDelta(delta) => {
-                *last_response += delta;
-            }
-            MessageResponseStreamEvent::ContentBlockStop(content) => {
-                if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
-                    self.app_event
-                        .send(AppEvent::ToolAddToExecute(tool_use))
-                        .ok();
-                }
-            }
-            MessageResponseStreamEvent::MessageStop => {
-                self.app_event.send(AppEvent::ExecuteTools).ok();
-            }
-            MessageResponseStreamEvent::Error { error } => {
-                self.llm_error = Some(error.clone());
-            }
-            _ => (),
-        }
-
-        last_message.set_content(last_response.content.clone());
-
-        self.update_chat_widgets();
-    }
-
-    fn update_chat_widgets(&mut self) {
-        let mut lines: Vec<Line> = self
-            .messages
+    pub async fn update_chat_widgets(&mut self) {
+        let messages = self.client.get_messages().await;
+        let llm_error = self.client.get_error().await;
+        self.usage = self.client.get_usage().await;
+        let mut lines: Vec<Line> = messages
             .clone()
             .into_iter()
             .flat_map(MessageWidget::get_lines)
             .collect();
 
-        if let Some(error) = &self.llm_error {
+        self.waiting = self.client.is_waiting().await;
+
+        if let Some(error) = llm_error {
             lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
         }
 
@@ -188,12 +138,6 @@ impl Chat {
         if self.stick_to_bottom {
             self.scroll_to_bottom();
         }
-    }
-
-    pub fn handle_llm_error(&mut self, error: LLMError) {
-        self.waiting = false;
-        self.llm_error = Some(error.into());
-        self.update_chat_widgets();
     }
 
     // Simplified to use a single scroll value
@@ -236,74 +180,39 @@ impl Chat {
         }
     }
 
-    pub fn reset_scroll(&mut self) {
-        if self.stick_to_bottom {
-            self.scroll_to_bottom();
-        } else {
-            self.set_vertical_scroll(0);
-        }
-    }
-
     pub fn set_area_size(&mut self, size: (u16, u16)) {
         let old_size = self.area_size;
         self.area_size = size;
 
         // If the area width changed, we need to recalculate line wrapping
         if old_size.0 != size.0 {
-            self.update_chat_widgets();
-        } else {
-            // Just update the scrollbar viewport height
-            self.vertical_scroll_state = self
-                .vertical_scroll_state
-                .viewport_content_length(size.1 as usize);
-
-            // Check if we need to adjust scroll position
-            if self.stick_to_bottom {
-                self.scroll_to_bottom();
-            } else {
-                // Make sure scroll position is still valid
-                self.set_vertical_scroll(self.scroll);
-            }
+            return;
         }
-    }
 
-    fn add_message(&mut self, message: Message) {
-        self.messages.push(message);
-        self.update_chat_widgets();
+        // Just update the scrollbar viewport height
+        self.vertical_scroll_state = self
+            .vertical_scroll_state
+            .viewport_content_length(size.1 as usize);
+
+        // Check if we need to adjust scroll position
+        if self.stick_to_bottom {
+            self.scroll_to_bottom();
+        } else {
+            // Make sure scroll position is still valid
+            self.set_vertical_scroll(self.scroll);
+        }
     }
 
     async fn send_message(&mut self, message: Option<Message>) {
-        self.llm_error = None;
-        if let Some(message) = message {
-            self.add_message(message);
-        }
-
-        let tx = self.app_event.clone();
-        let messages = self.messages.clone();
-
         let client = self.client.clone();
 
-        tokio::spawn({
-            async move {
-                tx.send(AppEvent::ChatGeneratingResponse).ok();
-                let response = client.send(messages).await;
-                if let Err(err) = response {
-                    tx.send(AppEvent::ChatError(err)).ok();
-                    return;
-                }
-
-                let mut response = response.unwrap();
-                while let Some(data) = response.recv().await {
-                    tx.send(AppEvent::ChatChunk(data)).ok();
-                }
-
-                tx.send(AppEvent::ChatGeneratedResponse).ok();
-            }
+        tokio::spawn(async move {
+            client.send_message(message).await;
         });
     }
 
     async fn send_user_message(&mut self) {
-        if self.waiting {
+        if self.client.is_waiting().await {
             return;
         }
 
@@ -316,21 +225,6 @@ impl Chat {
         self.prompt.flush();
 
         self.send_message(Some(message)).await;
-    }
-
-    pub fn handle_message_chunk(&mut self, chunk: MessageResponseStreamEvent) {
-        self.add_chunk(chunk);
-    }
-
-    pub fn waiting_for_response(&mut self) {
-        self.waiting = true;
-        self.last_message_response = Some(MessageResponse::default());
-        self.messages.push(Assistant(vec![]));
-    }
-
-    pub fn generated_response(&mut self) {
-        self.waiting = false;
-        self.update_chat_widgets();
     }
 
     fn get_layout(&self, area: Rect) -> [Rect; 3] {
@@ -438,88 +332,11 @@ impl Chat {
         frame.render_widget(&self.prompt, input_inner_area);
     }
 
-    pub fn add_tool_to_execute(&mut self, tool: ToolUseContent) {
-        self.tools_to_execute.push(tool);
-    }
-
-    pub fn start_tool(&mut self, tool: ToolUseContent) {
-        let last_message = self.messages.last_mut().unwrap();
-        last_message.set_tool_state(tool.get_id(), ToolUseState::Executing);
-    }
-
-    pub async fn tool_finished(&mut self, result: ToolResultContent) {
-        let tool_id = result.get_tool_use_id();
-        self.tools_results.push(result);
-
-        let last_message = self.messages.last_mut().unwrap();
-        last_message.set_tool_state(tool_id, ToolUseState::Executed);
-
-        if self.tools_results.len() == self.tools_to_execute.len() {
-            self.send_tools_results().await;
-        }
-    }
-
-    pub fn execute_tools(&mut self) {
-        let tools = self.tools_to_execute.clone();
-
-        for tool in tools {
-            tokio::spawn({
-                let client = self.client.clone();
-                let tx = self.app_event.clone();
-
-                async move {
-                    let (name, props) = tool.get_execute_params();
-                    tx.send(AppEvent::ToolStart(tool.clone())).ok();
-                    let result = client.execute_tool(name.as_str(), props).await;
-
-                    let result = if let Ok(value) = result {
-                        let value = serde_json::from_value(value).unwrap_or_else(|e| e.to_string());
-                        tool.create_response(value)
-                    } else {
-                        tool.create_response("Error executing tool".to_string())
-                    };
-                    tx.send(AppEvent::ToolEnd(result)).ok();
-                }
-            });
-        }
-    }
-
-    async fn send_tools_results(&mut self) {
-        let contents = self.tools_results.clone();
-        self.tools_results.clear();
-        self.tools_to_execute.clear();
-
-        let message = User(Content::new_tool_results(contents));
-
-        self.send_message(Some(message)).await;
-    }
-
-    pub fn remove_last_message(&mut self) {
-        if self.waiting {
+    pub async fn clear_chat(&mut self) {
+        if let Err(_) = self.client.clone().reset().await {
             return;
         }
 
-        if let Some(Assistant(content)) = self.messages.last() {
-            if content.is_empty() {
-                // pop twice because empty content is not visible for the user
-                self.messages.pop();
-            }
-        }
-
-        self.messages.pop();
-        self.llm_error = None;
-        self.update_chat_widgets();
-    }
-
-    pub fn clear_chat(&mut self) {
-        if self.waiting {
-            return;
-        }
-
-        self.last_message_response = None;
-        self.tools_results.clear();
-        self.tools_to_execute.clear();
-        self.messages.clear();
         self.lines.clear();
         self.paragraph = Paragraph::new(Vec::new());
         self.vertical_scroll_state = ScrollbarState::default();
@@ -530,28 +347,18 @@ impl Chat {
 
     /// Retry last message that was sent by the user
     pub async fn retry_last_message(&mut self) {
-        if self.waiting {
-            return;
-        }
+        let client = self.client.clone();
+        tokio::spawn(async move {
+            client.retry_last_message().await;
+        });
+    }
 
-        loop {
-            let last_message = self.messages.last();
-            if last_message.is_none() {
-                break;
-            }
+    pub async fn remove_last_message(&mut self) {
+        self.client.remove_last_message().await;
+    }
 
-            if let Assistant(_) = last_message.unwrap() {
-                self.messages.pop();
-                continue;
-            }
-
-            break;
-        }
-
-        if self.messages.len() == 0 {
-            return;
-        }
-
-        self.send_message(None).await;
+    pub async fn on_error(&mut self, error: ErrorContent) {
+        self.error = Some(error);
+        self.update_chat_widgets().await;
     }
 }

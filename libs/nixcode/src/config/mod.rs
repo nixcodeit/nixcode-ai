@@ -214,7 +214,7 @@ impl ToolsConfig {
 
 /// Get the path to the user's configuration file
 fn get_user_config_path() -> Option<PathBuf> {
-    if let Some(proj_dirs) = ProjectDirs::from("it", "nixcode", "nixcode-ai") {
+    if let Some(proj_dirs) = ProjectDirs::from("it.nixcode", "nixcode", "nixcode-ai") {
         let config_dir = proj_dirs.config_dir();
         Some(config_dir.join("config.toml"))
     } else {

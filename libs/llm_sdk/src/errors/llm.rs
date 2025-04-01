@@ -1,7 +1,7 @@
 use crate::ErrorContent;
 use anyhow::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LLMError {
     CreateClientError(String),
     InvalidRequest,
