@@ -351,10 +351,12 @@ impl Chat {
         tokio::spawn(async move {
             client.retry_last_message().await;
         });
+        self.update_chat_widgets().await;
     }
 
     pub async fn remove_last_message(&mut self) {
         self.client.remove_last_message().await;
+        self.update_chat_widgets().await;
     }
 
     pub async fn on_error(&mut self, error: ErrorContent) {

@@ -476,6 +476,7 @@ impl Nixcode {
             return;
         }
 
+        drop(messages);
         self.clone().send_message(None).await
     }
 

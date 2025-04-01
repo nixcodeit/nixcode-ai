@@ -225,7 +225,9 @@ impl App {
             "retry" => {
                 self.tx.send(AppEvent::RetryLastMessage).ok();
             }
-            "remove-last-message" => self.chat_view.remove_last_message().await,
+            "remove-last-message" => {
+                self.tx.send(AppEvent::RemoveLastMessage).ok();
+            },
             _ => panic!("Command not implemented: {}", command),
         }
 
