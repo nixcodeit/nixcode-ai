@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: nixcode-ai Documentation
-    url: https://github.com/yourusername/nixcode-ai/README.md
+    url: https://github.com/nixcodeit/nixcode-ai/README.md
     about: Check the documentation before creating an issue
   - name: Contact the Maintainer
     url: mailto:kontakt@nixcode.it
