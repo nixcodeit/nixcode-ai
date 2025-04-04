@@ -88,19 +88,18 @@ impl OpenAIClient {
                 let mut tool_use = false;
                 let mut tool_calls = vec![];
                 let mut tools = vec![];
+                let mut texts = vec![];
                 // Convert content to OpenAI format
-                let content = msg
+                msg
                     .get_content()
                     .iter()
-                    .filter_map(|content| match content {
-                        Content::Text(text) => Some(json!({ "type": "text", "text": text.text })),
-                        Content::Image(img) => Some(json!({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "image_url_would_be_here",
-                                "detail": "auto"
-                            }
-                        })),
+                    .for_each(|content| match content {
+                        Content::Text(text) => {
+                            texts.push(json!({
+                                "role": role,
+                                "content": text.text
+                            }));
+                        },
                         Content::ToolUse(content) => {
                             tool_use = true;
                             tool_calls.push(json!({
@@ -111,7 +110,6 @@ impl OpenAIClient {
                                     "arguments": serde_json::to_string(&content.input).unwrap(),
                                 }
                             }));
-                            None
                         }
                         Content::ToolResult(content) => {
                             tools.push(json!({
@@ -119,19 +117,15 @@ impl OpenAIClient {
                                 "content": content.get_content(),
                                 "tool_call_id": content.get_tool_use_id(),
                             }));
-                            None
                         }
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
+                        _ => (),
+                    });
 
                 let mut msgs = vec![];
-                if content.len() > 0 {
-                    msgs.push(json!({
-                        "role": role,
-                        "content": content,
-                    }));
+                if texts.len() > 0 {
+                    msgs.extend(texts);
                 }
+
                 if tool_calls.len() > 0 {
                     msgs.push(json!({
                         "role": role,
@@ -150,10 +144,14 @@ impl OpenAIClient {
         // Add system message if present
         let mut all_messages = Vec::new();
         if let Some(system) = request.get_system() {
-            all_messages.push(json!({
-                "role": "system",
-                "content": system
-            }));
+            let system_message = system.iter().flat_map(|x| x.get_text()).map(|x| x.text).collect::<Vec<_>>().join("\n\n");
+
+            if !system_message.is_empty() {
+                all_messages.push(json!({
+                    "role": "system",
+                    "content": system_message
+                }));
+            }
         }
         all_messages.extend(messages);
 
@@ -187,6 +185,7 @@ impl OpenAIClient {
             },
             // "temperature": request.get_temperature(),
             "max_completion_tokens": request.get_max_tokens(),
+            "reasoning_format": "hidden"
         });
 
         // // Add tools if present
@@ -217,9 +216,17 @@ impl LLMClientImpl for OpenAIClient {
         &self,
         request: Request,
     ) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
+        let base_url = self.config.api_base.clone();
+        if base_url.is_none() {
+            return Err(LLMError::InvalidConfig(
+                "API base URL is not set".to_string(),
+            ));
+        }
+        let base_url = base_url.unwrap();
+
         let openai_body = self.request_to_openai(&request);
 
-        log::debug!("Original request: {:?}", request);
+        // log::debug!("Original request: {:?}", request);
         log::debug!(
             "OpenAI request body: {}",
             serde_json::to_string_pretty(&openai_body).unwrap()
@@ -227,7 +234,7 @@ impl LLMClientImpl for OpenAIClient {
 
         let response = self
             .client
-            .post("https://api.openai.com/v1/chat/completions")
+            .post(format!("{}/v1/chat/completions", base_url))
             .json(&openai_body)
             .send()
             .await;
@@ -254,6 +261,7 @@ impl LLMClientImpl for OpenAIClient {
             let mut last_content_index = 0;
             let mut has_any_content = false;
             let mut has_pending_end_block = false;
+
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(event) => {
@@ -281,18 +289,14 @@ impl LLMClientImpl for OpenAIClient {
                         let stream_response =
                             serde_json::from_str::<OpenAIStreamResponse>(event.data.as_str());
                         if let Err(e) = stream_response {
-                            log::debug!(
-                                "====\nError parsing stream response: {:?}\n{:?}\n=====",
-                                event.data,
-                                e
-                            );
-                            tx.send(MessageResponseStreamEvent::Error {
+                            let event = MessageResponseStreamEvent::Error {
                                 error: ErrorEventContent {
                                     message: e.to_string(),
                                     r#type: "ParsingError".into(),
                                 },
-                            })
-                            .ok();
+                            };
+                            log::debug!("{:?}", event);
+                            tx.send(event).ok();
                             continue;
                         }
 
@@ -310,14 +314,45 @@ impl LLMClientImpl for OpenAIClient {
                                     usage: Usage::default(),
                                 };
 
-                                let evt = MessageResponseStreamEvent::MessageStart(
+                                let event = MessageResponseStreamEvent::MessageStart(
                                     crate::message::anthropic::events::MessageStartEventContent {
                                         message: message_response,
                                     },
                                 );
-                                log::debug!("{:?}", evt);
-                                tx.send(evt).ok();
+                                log::debug!("{:?}", event);
+                                tx.send(event).ok();
                             }
+
+                            // if let Some(reasoning) = &choice.delta.reasoning {
+                            //     if !has_any_content {
+                            //         let start_event = MessageResponseStreamEvent::ContentBlockStart(
+                            //             ContentBlockStartEventContent {
+                            //                 index: 0,
+                            //                 content_block: Content::new_text(reasoning),
+                            //             },
+                            //         );
+                            //
+                            //         has_any_content = true;
+                            //         has_pending_end_block = true;
+                            //
+                            //         log::debug!("{:?}", start_event);
+                            //         tx.send(start_event).ok();
+                            //         continue;
+                            //     }
+                            //
+                            //     let delta = ContentDelta::TextDelta(
+                            //         crate::message::content::text::ContentTextDelta {
+                            //             text: reasoning.clone(),
+                            //         },
+                            //     );
+                            //
+                            //     let event = MessageResponseStreamEvent::ContentBlockDelta(
+                            //         ContentBlockDeltaEventContent { index: choice.index, delta },
+                            //     );
+                            //     log::debug!("{:?}", event);
+                            //     tx.send(event).ok();
+                            //     continue;
+                            // }
 
                             // If the delta contains content, it's a content block delta
                             if let Some(content) = &choice.delta.content {
@@ -332,7 +367,6 @@ impl LLMClientImpl for OpenAIClient {
                                     has_any_content = true;
                                     has_pending_end_block = true;
 
-                                    // Return the start event - the first delta will be handled in the next call
                                     log::debug!("{:?}", start_event);
                                     tx.send(start_event).ok();
                                     continue;
@@ -345,8 +379,9 @@ impl LLMClientImpl for OpenAIClient {
                                 );
 
                                 let event = MessageResponseStreamEvent::ContentBlockDelta(
-                                    ContentBlockDeltaEventContent { index: 0, delta },
+                                    ContentBlockDeltaEventContent { index: choice.index, delta },
                                 );
+
                                 log::debug!("{:?}", event);
                                 tx.send(event).ok();
                                 continue;
@@ -365,21 +400,27 @@ impl LLMClientImpl for OpenAIClient {
 
                                 let tool_call = &tool_calls[0];
                                 if tool_call.index > last_content_index {
-                                    let evt = MessageResponseStreamEvent::ContentBlockStop(
+                                    let event = MessageResponseStreamEvent::ContentBlockStop(
                                         ContentBlockStopEventContent {
                                             index: last_content_index,
                                         },
                                     );
                                     has_pending_end_block = false;
-                                    log::debug!("{:?}", evt);
-                                    tx.send(evt).ok();
 
+                                    log::debug!("{:?}", event);
+                                    tx.send(event).ok();
                                     last_content_index = tool_call.index;
                                 }
 
                                 if let Some(id) = &tool_call.id {
+                                    let input = serde_json::from_str::<Value>(
+                                        &tool_call.function.arguments,
+                                    ).unwrap_or(Value::Null);
+
                                     let content = ToolUseContent {
                                         id: id.clone(),
+                                        input,
+                                        _input_raw: tool_call.function.arguments.clone(),
                                         name: String::from(
                                             tool_call
                                                 .function
@@ -393,12 +434,12 @@ impl LLMClientImpl for OpenAIClient {
                                         index: tool_call.index,
                                         content_block: Content::new_tool_use(content),
                                     };
-                                    let evt = MessageResponseStreamEvent::ContentBlockStart(
+                                    let event = MessageResponseStreamEvent::ContentBlockStart(
                                         start_content,
                                     );
                                     has_pending_end_block = true;
-                                    log::debug!("{:?}", evt);
-                                    tx.send(evt).ok();
+                                    log::debug!("{:?}", event);
+                                    tx.send(event).ok();
                                 } else {
                                     // tool args chunks
                                     let content = ContentBlockDeltaEventContent {
@@ -409,10 +450,11 @@ impl LLMClientImpl for OpenAIClient {
                                             },
                                         ),
                                     };
-                                    let evt =
+                                    let event =
                                         MessageResponseStreamEvent::ContentBlockDelta(content);
-                                    log::debug!("{:?}", evt);
-                                    tx.send(evt).ok();
+
+                                    log::debug!("{:?}", event);
+                                    tx.send(event).ok();
                                 }
                             }
 
@@ -427,13 +469,14 @@ impl LLMClientImpl for OpenAIClient {
                             // Handle finish reason
                             if let Some(finish_reason) = &choice.finish_reason {
                                 if has_pending_end_block {
-                                    let evt = MessageResponseStreamEvent::ContentBlockStop(
+                                    let event = MessageResponseStreamEvent::ContentBlockStop(
                                         ContentBlockStopEventContent {
                                             index: last_content_index,
                                         },
                                     );
-                                    log::debug!("{:?}", evt);
-                                    tx.send(evt).ok();
+
+                                    log::debug!("{:?}", event);
+                                    tx.send(event).ok();
                                 }
 
                                 // Map OpenAI finish reason to Anthropic stop reason
@@ -460,95 +503,16 @@ impl LLMClientImpl for OpenAIClient {
                                 tx.send(event).ok();
                             }
                         };
-
-                        // let event = MessageResponseStreamEvent::try_from(stream_response);
-                        // if let Err(e) = event {
-                        //     tx.send(MessageResponseStreamEvent::Error {
-                        //         error: e.into(),
-                        //     }).ok();
-                        //     continue;
-                        // }
-                        // let event = event.unwrap();
-                        // log::debug!("{:?}", event);
-                        // println!("{:?}", event);
-
-                        // OpenAI sends "data: " prefixed chunks
-                        // let chunk_str = String::from_utf8_lossy(&bytes);
-                        // for line in chunk_str.lines() {
-                        //     if line.starts_with("data: ") {
-                        //         let data = &line[6..]; // Skip "data: "
-                        //
-                        //         // Handle [DONE] message
-                        //         if data == "[DONE]" {
-                        //             // If we had a content block, close it
-                        //             if content_block_started {
-                        //                 tx.send(MessageResponseStreamEvent::ContentBlockStop(
-                        //                     crate::message::anthropic::events::ContentBlockStopEventContent {
-                        //                         index: 0,
-                        //                     },
-                        //                 )).ok();
-                        //             }
-                        //
-                        //             // Send MessageStop event
-                        //             tx.send(MessageResponseStreamEvent::MessageStop).ok();
-                        //             continue;
-                        //         }
-                        //
-                        //         // Parse the JSON response
-                        //         match serde_json::from_str::<OpenAIStreamResponse>(data) {
-                        //             Ok(openai_response) => {
-                        //                 // Convert to our internal event format
-                        //                 match MessageResponseStreamEvent::try_from(openai_response) {
-                        //                     Ok(event) => {
-                        //                         // Update state flags based on event type
-                        //                         match &event {
-                        //                             MessageResponseStreamEvent::MessageStart(_) => {
-                        //                                 message_started = true;
-                        //                             },
-                        //                             MessageResponseStreamEvent::ContentBlockStart(_) => {
-                        //                                 content_block_started = true;
-                        //                             },
-                        //                             MessageResponseStreamEvent::MessageStop => {
-                        //                                 message_started = false;
-                        //                                 content_block_started = false;
-                        //                             },
-                        //                             MessageResponseStreamEvent::ContentBlockStop(_) => {
-                        //                                 content_block_started = false;
-                        //                             },
-                        //                             _ => {}
-                        //                         }
-                        //
-                        //                         // Send the event
-                        //                         tx.send(event).ok();
-                        //                     },
-                        //                     Err(e) => {
-                        //                         let content: ErrorEventContent = e.into();
-                        //                         tx.send(MessageResponseStreamEvent::Error {
-                        //                             error: content,
-                        //                         }).ok();
-                        //                     }
-                        //                 }
-                        //             },
-                        //             Err(e) => {
-                        //                 tx.send(MessageResponseStreamEvent::Error {
-                        //                     error: ErrorEventContent {
-                        //                         r#type: "ParsingError".into(),
-                        //                         message: e.to_string(),
-                        //                     },
-                        //                 }).ok();
-                        //             }
-                        //         }
-                        //     }
-                        // }
                     }
                     Err(e) => {
-                        tx.send(MessageResponseStreamEvent::Error {
+                        let event = MessageResponseStreamEvent::Error {
                             error: ErrorEventContent {
                                 r#type: "StreamError".into(),
                                 message: e.to_string(),
                             },
-                        })
-                        .ok();
+                        };
+                        log::debug!("{:?}", event);
+                        tx.send(event).ok();
                     }
                 };
             }

@@ -4,8 +4,8 @@ use std::ops::AddAssign;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ThinkingContent {
-    thinking: String,
-    signature: String,
+    pub thinking: String,
+    pub signature: String,
 }
 
 impl ThinkingContent {
@@ -39,7 +39,7 @@ pub struct RedactedThinkingContent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContentThinkingDelta {
-    thinking: String,
+    pub thinking: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

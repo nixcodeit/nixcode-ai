@@ -24,6 +24,7 @@ pub struct OpenAIStreamChoice {
 pub struct OpenAIDelta {
     pub role: Option<String>,
     pub content: Option<String>,
+    pub reasoning: Option<String>,
     pub tool_calls: Option<Vec<OpenAIToolCall>>,
 }
 

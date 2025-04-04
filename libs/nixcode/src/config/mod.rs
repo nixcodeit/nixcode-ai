@@ -12,6 +12,7 @@ use toml;
 const DEFAULT_ANTHROPIC_MODEL: &str = "claude-3-7-sonnet-20250219";
 /// Default model for OpenAI
 const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
+const DEFAULT_GROQ_MODEL: &str = "gwen-qwq-32b";
 
 /// The Config struct represents the application configuration
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,6 +55,10 @@ pub struct Providers {
     /// OpenAI-specific settings
     #[serde(default)]
     pub openai: ProviderSettings,
+
+    /// Groq-specific settings
+    #[serde(default)]
+    pub groq: ProviderSettings,
 }
 
 /// Settings for a specific provider
@@ -96,6 +101,10 @@ impl Config {
                     default_model: Some(DEFAULT_OPENAI_MODEL.to_string()),
                     ..Default::default()
                 },
+                groq: ProviderSettings {
+                    default_model: Some(DEFAULT_GROQ_MODEL.to_string()),
+                    ..Default::default()
+                }
             },
             tools: ToolsConfig::default(),
         }
@@ -142,6 +151,12 @@ impl Config {
                 .default_model
                 .clone()
                 .unwrap_or_else(|| DEFAULT_OPENAI_MODEL.to_string()),
+            "groq" => self
+                .providers
+                .groq
+                .default_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_GROQ_MODEL.to_string()),
             _ => DEFAULT_ANTHROPIC_MODEL.to_string(),
         }
     }
@@ -165,6 +180,18 @@ impl Config {
             "openai" => {
                 // Try config first
                 if let Some(key) = &self.providers.openai.api_key {
+                    expand_env_vars(key)
+                } else {
+                    // Fall back to environment variable
+                    env::var("OPENAI_API_KEY").map_err(|_| {
+                        anyhow::anyhow!(
+                            "OPENAI_API_KEY environment variable not set and not configured"
+                        )
+                    })?
+                }
+            },
+            "groq" => {
+                if let Some(key) = &self.providers.groq.api_key {
                     expand_env_vars(key)
                 } else {
                     // Fall back to environment variable

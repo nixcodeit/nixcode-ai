@@ -5,6 +5,7 @@ pub enum LLMProvider {
     Anthropic,
     OpenAI,
     Gemini,
+    Groq,
 }
 
 impl LLMProvider {
@@ -13,19 +14,7 @@ impl LLMProvider {
             LLMProvider::Anthropic => "claude-3-7-sonnet-20250219",
             LLMProvider::OpenAI => "gpt-4o",
             LLMProvider::Gemini => "gemini-pro",
-        }
-    }
-
-    pub fn from_model_name(model_name: &str) -> Self {
-        if model_name.starts_with("claude") {
-            LLMProvider::Anthropic
-        } else if model_name.starts_with("gpt") {
-            LLMProvider::OpenAI
-        } else if model_name.starts_with("gemini") {
-            LLMProvider::Gemini
-        } else {
-            // Default to OpenAI if unknown
-            LLMProvider::OpenAI
+            LLMProvider::Groq => "qwen-qwq-32b",
         }
     }
 
@@ -39,6 +28,7 @@ impl LLMProvider {
             ],
             LLMProvider::OpenAI => vec!["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
             LLMProvider::Gemini => vec!["gemini-pro", "gemini-ultra"],
+            LLMProvider::Groq => vec!["qwen-qwq-32b", "qwen-2.5-coder-32b", "llama-3.3-70b-specdec"],
         }
     }
 }

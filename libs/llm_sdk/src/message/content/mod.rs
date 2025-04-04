@@ -83,6 +83,13 @@ impl Content {
     pub fn new_tool_results(results: Vec<ToolResultContent>) -> Vec<Content> {
         results.into_iter().map(Content::new_tool_result).collect()
     }
+
+    pub fn new_reasoning(text: impl Into<String>) -> Self {
+        Content::Thinking(ThinkingContent {
+            thinking: text.into(),
+            signature: "".into(),
+        })
+    }
 }
 
 impl Into<Vec<Content>> for Content {

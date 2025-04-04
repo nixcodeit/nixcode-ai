@@ -15,6 +15,7 @@ pub enum LLMError {
     MissingAPIKey,
     ConversionError(String),
     Generic(String),
+    InvalidConfig(String),
 }
 
 impl Into<Error> for LLMError {
@@ -35,6 +36,7 @@ impl Into<Error> for LLMError {
             LLMError::MissingAPIKey => Error::msg("Missing API key"),
             LLMError::ConversionError(e) => Error::msg(format!("Conversion error: {}", e)),
             LLMError::Generic(e) => Error::msg(e),
+            LLMError::InvalidConfig(e) => Error::msg(format!("Invalid config: {}", e)),
         }
     }
 }
@@ -55,6 +57,7 @@ impl Into<ErrorEventContent> for LLMError {
                 LLMError::MissingAPIKey => "missing_api_key".into(),
                 LLMError::ConversionError(_) => "conversion_error".into(),
                 LLMError::Generic(_) => "generic".into(),
+                LLMError::InvalidConfig(_) => "invalid_config".into(),
             },
             message: match self {
                 LLMError::CreateClientError(e) => e,
@@ -75,6 +78,9 @@ impl Into<ErrorEventContent> for LLMError {
                     format!("Error converting between API formats: {}", e)
                 }
                 LLMError::Generic(e) => e,
+                LLMError::InvalidConfig(e) => {
+                    format!("Invalid config: {}", e)
+                }
             },
         }
     }
