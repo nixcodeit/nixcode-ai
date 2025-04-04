@@ -19,3 +19,5 @@ unicode-width = "0.1.11" # For correct handling of character widths in terminal
 openssl-sys = { version = "0.9", features = ["vendored"] }
 syntect = { version = "5.2.0" }
 lazy_static = "1.5.0"
+simple-logging = { version = "2.0.2" }
+log = { version = "0.4.27" }

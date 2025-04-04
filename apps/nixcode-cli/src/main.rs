@@ -11,11 +11,12 @@ mod input_mode;
 mod popup_utils;
 mod status_bar;
 mod user_input;
-mod widgets;
 mod utils;
+mod widgets;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    simple_logging::log_to_file(".nixcode/debug.log", log::LevelFilter::Debug)?;
     // Load environment variables from .env file if present
     dotenv().ok();
 

@@ -2,3 +2,4 @@
 /target
 .env*
 .nixcode/config.toml
+.nixcode/debug.log
