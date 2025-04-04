@@ -24,3 +24,4 @@ directories = "5.0.1"
 walkdir = "2.5.0"
 git2 = "0.20.1"
 chrono = "0.4"
+log = { version = "0.4.27" }

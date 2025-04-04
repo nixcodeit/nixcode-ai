@@ -1,4 +1,4 @@
-use crate::ErrorContent;
+use crate::message::anthropic::events::ErrorEventContent;
 use anyhow::Error;
 
 #[derive(Debug, Clone)]
@@ -13,6 +13,7 @@ pub enum LLMError {
     Timeout,
     InputTooLong,
     MissingAPIKey,
+    ConversionError(String),
     Generic(String),
 }
 
@@ -32,14 +33,15 @@ impl Into<Error> for LLMError {
             LLMError::Timeout => Error::msg("Timeout"),
             LLMError::InputTooLong => Error::msg("Input too long"),
             LLMError::MissingAPIKey => Error::msg("Missing API key"),
+            LLMError::ConversionError(e) => Error::msg(format!("Conversion error: {}", e)),
             LLMError::Generic(e) => Error::msg(e),
         }
     }
 }
 
-impl Into<ErrorContent> for LLMError {
-    fn into(self) -> ErrorContent {
-        ErrorContent {
+impl Into<ErrorEventContent> for LLMError {
+    fn into(self) -> ErrorEventContent {
+        ErrorEventContent {
             r#type: match self {
                 LLMError::CreateClientError(_) => "create_client_error".into(),
                 LLMError::InvalidRequest => "invalid_request".into(),
@@ -51,6 +53,7 @@ impl Into<ErrorContent> for LLMError {
                 LLMError::Timeout => "timeout".into(),
                 LLMError::InputTooLong => "input_too_long".into(),
                 LLMError::MissingAPIKey => "missing_api_key".into(),
+                LLMError::ConversionError(_) => "conversion_error".into(),
                 LLMError::Generic(_) => "generic".into(),
             },
             message: match self {
@@ -68,6 +71,7 @@ impl Into<ErrorContent> for LLMError {
                 LLMError::MissingAPIKey => {
                     "Missing API key. Please provide in config file or environment variable.".into()
                 }
+                LLMError::ConversionError(e) => format!("Error converting between API formats: {}", e),
                 LLMError::Generic(e) => e,
             },
         }

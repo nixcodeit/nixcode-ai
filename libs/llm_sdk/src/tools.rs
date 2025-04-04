@@ -3,10 +3,10 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
-    name: String,
-    description: String,
+    pub(crate) name: String,
+    pub(crate) description: String,
     #[serde(rename = "input_schema")]
-    input: Value,
+    pub(crate) input: Value,
 }
 
 impl Tool {

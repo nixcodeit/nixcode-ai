@@ -79,7 +79,13 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn get_schema(&self) -> nixcode_llm_sdk::tools::Tool {
                 let schema = schemars::schema_for!(#param_ident);
-                let parameters = serde_json::to_value(&schema).unwrap();
+                let mut parameters = serde_json::to_value(&schema).unwrap();
+                let mut obj = parameters.as_object_mut().unwrap();
+                if !obj.contains_key("properties") {
+                    obj.extend([
+                        ("properties".into(), serde_json::json!({}))
+                    ]);
+                }
 
                 let tool_name = #tool_name.to_string();
                 let description = #description_expr;

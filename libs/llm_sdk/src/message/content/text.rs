@@ -44,5 +44,5 @@ impl AddAssign<ContentTextDelta> for TextContent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContentTextDelta {
-    text: String,
+    pub(crate) text: String,
 }

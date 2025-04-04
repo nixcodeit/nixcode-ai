@@ -18,16 +18,16 @@ pub enum ToolUseState {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ToolUseContent {
-    id: String,
-    name: String,
-    input: Value,
+    pub id: String,
+    pub name: String,
+    pub input: Value,
     #[serde(default = "default_value")]
     #[serde(skip_serializing)]
-    _input_raw: String,
+    pub _input_raw: String,
     #[serde(skip)]
-    _tool_execution_state: ToolUseState,
+    pub _tool_execution_state: ToolUseState,
     #[serde(skip)]
-    _tool_result: Value,
+    pub _tool_result: Value,
 }
 
 impl ToolUseContent {
@@ -102,5 +102,5 @@ impl ToolResultContent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContentInputJsonDelta {
-    partial_json: String,
+    pub(crate) partial_json: String,
 }

@@ -33,15 +33,18 @@ use crate::tools::search::replace_content::ReplaceContentTool;
 use crate::tools::search::search_content::SearchContentTool;
 use crate::tools::Tools;
 use anyhow::Result;
+use nixcode_llm_sdk::client::request::Request;
+use nixcode_llm_sdk::client::LLMClient;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
+use nixcode_llm_sdk::message::anthropic::events::{ErrorEventContent, MessageResponseStreamEvent};
 use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::message::message::Message::Assistant;
 use nixcode_llm_sdk::message::response::MessageResponse;
 use nixcode_llm_sdk::message::usage::Usage;
-use nixcode_llm_sdk::{ErrorContent, LLMClient, MessageResponseStreamEvent, Request};
+use nixcode_llm_sdk::providers::LLMProvider;
 use secrecy::SecretString;
 use std::default::Default;
 use std::env;
@@ -60,7 +63,7 @@ pub struct Nixcode {
     tools_to_execute: RwLock<Vec<ToolUseContent>>,
     tools_results: RwLock<Vec<ToolResultContent>>,
     last_message_response: RwLock<Option<MessageResponse>>,
-    llm_error: RwLock<Option<ErrorContent>>,
+    llm_error: RwLock<Option<ErrorEventContent>>,
     is_waiting: RwLock<bool>,
     tx: UnboundedSender<NixcodeEvent>,
 }
@@ -153,13 +156,13 @@ impl Nixcode {
         match (provider.as_str(), api_key_result) {
             // Anthropic with available API key
             ("anthropic", Ok(api_key)) => {
-                let llm_config = LLMConfig { api_key };
+                let llm_config = LLMConfig { provider: LLMProvider::Anthropic, api_key, default_model: "".to_string() };
                 let client = LLMClient::new_anthropic(llm_config)?;
                 Self::new(project, client, config)
             }
             // OpenAI with available API key
             ("openai", Ok(api_key)) => {
-                let llm_config = LLMConfig { api_key };
+                let llm_config = LLMConfig { provider: LLMProvider::OpenAI, api_key, default_model: "gpt-4o".to_string() };
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }
@@ -168,7 +171,9 @@ impl Nixcode {
                 let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LLMError::MissingAPIKey)?;
 
                 let llm_config = LLMConfig {
+                    provider: LLMProvider::Anthropic,
                     api_key: SecretString::new(api_key.into()),
+                    default_model: "".to_string(),
                 };
 
                 let client = LLMClient::new_anthropic(llm_config)?;
@@ -215,7 +220,7 @@ impl Nixcode {
 
         let mut request = Request::default()
             .with_model(self.model.clone())
-            .with_max_tokens(51200)
+            .with_max_tokens(16384)
             .with_messages(messages)
             .with_system_prompt(system_prompt)
             // .with_thinking(ThinkingOptions::new(8192))
@@ -333,7 +338,7 @@ impl Nixcode {
         self.messages.read().await.clone()
     }
 
-    pub async fn get_error(&self) -> Option<ErrorContent> {
+    pub async fn get_error(&self) -> Option<ErrorEventContent> {
         self.llm_error.read().await.clone()
     }
 
@@ -368,32 +373,40 @@ impl Nixcode {
                 *last_response += msg;
                 *usage += last_response.usage.clone();
                 message_updated = true;
+                log::debug!("MessageStart: {:?}", last_response);
             }
             MessageResponseStreamEvent::MessageDelta(delta) => {
-                usage.output_tokens += delta.get_usage().output_tokens;
+                usage.output_tokens += delta.usage.output_tokens;
                 *last_response += delta;
                 message_updated = true;
+                log::debug!("MessageDelta: {:?}", last_response);
             }
             MessageResponseStreamEvent::ContentBlockStart(content) => {
                 *last_response += content;
                 message_updated = true;
+                log::debug!("ContentBlockStart: {:?}", last_response);
             }
             MessageResponseStreamEvent::ContentBlockDelta(delta) => {
-                let index = delta.get_index();
+                let index = delta.index;
                 *last_response += delta;
+                log::debug!("ContentBlockDelta: {:?}", last_response);
 
                 match last_response.get_content(index) {
                     Content::ToolUse(_) => (),
-                    _ => { message_updated = true; },
+                    _ => {
+                        message_updated = true;
+                    }
                 }
             }
             MessageResponseStreamEvent::ContentBlockStop(content) => {
+                log::debug!("ContentBlockStop: {:?}", last_response);
                 if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
                     self.clone().add_tool_to_execute(tool_use).await;
                 }
                 message_updated = true;
             }
             MessageResponseStreamEvent::Error { error } => {
+                log::error!("Error: {:?}", error);
                 *self.llm_error.write().await = Some(error.clone());
             }
             _ => (),

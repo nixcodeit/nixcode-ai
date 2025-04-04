@@ -1,11 +1,8 @@
+use crate::message::anthropic::events::{ContentBlockDeltaEventContent, ContentBlockStartEventContent, MessageDeltaEventContent, MessageStartEventContent};
 use crate::message::content::tools::ToolUseContent;
 use crate::message::content::{Content, ContentDelta};
 use crate::message::usage::Usage;
 use crate::stop_reason::StopReason;
-use crate::{
-    ContentBlockDeltaEventContent, ContentBlockStartEventContent, MessageDeltaEventContent,
-    MessageStartEventContent,
-};
 use serde::{Deserialize, Serialize};
 use std::ops::AddAssign;
 
