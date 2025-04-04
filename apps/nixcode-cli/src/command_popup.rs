@@ -322,11 +322,7 @@ impl Widget for &CommandPopup {
             .borders(Borders::ALL);
 
         if let Some(bg) = THEME.settings.background {
-            let c = Color::Rgb(
-                bg.r,
-                bg.g,
-                bg.b,
-            );
+            let c = Color::Rgb(bg.r, bg.g, bg.b);
             input_block = input_block.bg(c);
         }
 

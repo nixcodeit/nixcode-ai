@@ -15,7 +15,7 @@ impl LLMProvider {
             LLMProvider::Gemini => "gemini-pro",
         }
     }
-    
+
     pub fn from_model_name(model_name: &str) -> Self {
         if model_name.starts_with("claude") {
             LLMProvider::Anthropic
@@ -28,7 +28,7 @@ impl LLMProvider {
             LLMProvider::OpenAI
         }
     }
-    
+
     pub fn available_models(&self) -> Vec<&str> {
         match self {
             LLMProvider::Anthropic => vec![
@@ -37,16 +37,8 @@ impl LLMProvider {
                 "claude-3-haiku-20240307",
                 "claude-3-7-sonnet-20250219",
             ],
-            LLMProvider::OpenAI => vec![
-                "gpt-4o",
-                "gpt-4-turbo",
-                "gpt-4",
-                "gpt-3.5-turbo",
-            ],
-            LLMProvider::Gemini => vec![
-                "gemini-pro",
-                "gemini-ultra",
-            ],
+            LLMProvider::OpenAI => vec!["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+            LLMProvider::Gemini => vec!["gemini-pro", "gemini-ultra"],
         }
     }
 }

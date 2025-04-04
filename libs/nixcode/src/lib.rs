@@ -156,13 +156,21 @@ impl Nixcode {
         match (provider.as_str(), api_key_result) {
             // Anthropic with available API key
             ("anthropic", Ok(api_key)) => {
-                let llm_config = LLMConfig { provider: LLMProvider::Anthropic, api_key, default_model: "".to_string() };
+                let llm_config = LLMConfig {
+                    provider: LLMProvider::Anthropic,
+                    api_key,
+                    default_model: "".to_string(),
+                };
                 let client = LLMClient::new_anthropic(llm_config)?;
                 Self::new(project, client, config)
             }
             // OpenAI with available API key
             ("openai", Ok(api_key)) => {
-                let llm_config = LLMConfig { provider: LLMProvider::OpenAI, api_key, default_model: "gpt-4o".to_string() };
+                let llm_config = LLMConfig {
+                    provider: LLMProvider::OpenAI,
+                    api_key,
+                    default_model: "gpt-4o".to_string(),
+                };
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }

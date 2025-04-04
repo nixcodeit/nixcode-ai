@@ -15,7 +15,8 @@ lazy_static::lazy_static! {
 
 fn syntect_style_to_ratatui(syntect_style: SyntectStyle) -> Style {
     let mut style = Style::default();
-    if syntect_style.foreground != syntect::highlighting::Color::BLACK { // Unikaj domyślnego tła jako koloru tekstu
+    if syntect_style.foreground != syntect::highlighting::Color::BLACK {
+        // Unikaj domyślnego tła jako koloru tekstu
         style = style.fg(Color::Rgb(
             syntect_style.foreground.r,
             syntect_style.foreground.g,
@@ -23,19 +24,31 @@ fn syntect_style_to_ratatui(syntect_style: SyntectStyle) -> Style {
         ));
     }
 
-    if syntect_style.font_style.contains(syntect::highlighting::FontStyle::BOLD) {
+    if syntect_style
+        .font_style
+        .contains(syntect::highlighting::FontStyle::BOLD)
+    {
         style = style.add_modifier(Modifier::BOLD);
     }
-    if syntect_style.font_style.contains(syntect::highlighting::FontStyle::ITALIC) {
+    if syntect_style
+        .font_style
+        .contains(syntect::highlighting::FontStyle::ITALIC)
+    {
         style = style.add_modifier(Modifier::ITALIC);
     }
-    if syntect_style.font_style.contains(syntect::highlighting::FontStyle::UNDERLINE) {
+    if syntect_style
+        .font_style
+        .contains(syntect::highlighting::FontStyle::UNDERLINE)
+    {
         style = style.add_modifier(Modifier::UNDERLINED);
     }
     style
 }
 
-pub fn highlight_code<'a>(code: String, extension: &str) -> Result<Vec<Line<'a>>, Box<dyn std::error::Error>> {
+pub fn highlight_code<'a>(
+    code: String,
+    extension: &str,
+) -> Result<Vec<Line<'a>>, Box<dyn std::error::Error>> {
     let syntax = SYNTAX_SET
         .find_syntax_by_extension(extension)
         .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());

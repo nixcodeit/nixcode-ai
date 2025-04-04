@@ -1,4 +1,7 @@
-use crate::message::anthropic::events::{ContentBlockDeltaEventContent, ContentBlockStartEventContent, MessageDeltaEventContent, MessageStartEventContent};
+use crate::message::anthropic::events::{
+    ContentBlockDeltaEventContent, ContentBlockStartEventContent, MessageDeltaEventContent,
+    MessageStartEventContent,
+};
 use crate::message::content::tools::ToolUseContent;
 use crate::message::content::{Content, ContentDelta};
 use crate::message::usage::Usage;

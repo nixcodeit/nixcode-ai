@@ -100,15 +100,15 @@ impl Request {
     pub fn get_tools(&self) -> &Option<Vec<Tool>> {
         &self.tools
     }
-    
+
     pub fn get_model(&self) -> &str {
         &self.model
     }
-    
+
     pub fn get_max_tokens(&self) -> Option<u32> {
         self.max_tokens
     }
-    
+
     pub fn get_temperature(&self) -> Option<f32> {
         self.temperature
     }

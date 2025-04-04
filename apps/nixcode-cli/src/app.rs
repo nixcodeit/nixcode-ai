@@ -6,7 +6,7 @@ use anyhow::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use nixcode::events::NixcodeEvent;
 use nixcode::{NewNixcodeResult, Nixcode};
-use nixcode_llm_sdk::ErrorContent;
+use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
 use ratatui::prelude::{Color, Modifier, Stylize};
 use ratatui::widgets::Block;
 use ratatui::{DefaultTerminal, Frame};
@@ -23,7 +23,7 @@ pub enum AppEvent {
     ClearChat,
     Quit,
     Render,
-    ChatError(ErrorContent),
+    ChatError(ErrorEventContent),
 }
 
 enum AppView {
@@ -193,14 +193,9 @@ impl App {
         let [main_area, status_area] = vertical.areas(area);
 
         if let Some(bg) = THEME.settings.background {
-            let c = Color::Rgb(
-                bg.r,
-                bg.g,
-                bg.b,
-            );
+            let c = Color::Rgb(bg.r, bg.g, bg.b);
             frame.render_widget(Block::new().bg(c), frame.area());
         }
-
 
         match self.current_view {
             AppView::Chat => self.chat_view.render_frame(frame, main_area),
@@ -238,7 +233,7 @@ impl App {
             }
             "remove-last-message" => {
                 self.tx.send(AppEvent::RemoveLastMessage).ok();
-            },
+            }
             _ => panic!("Command not implemented: {}", command),
         }
 

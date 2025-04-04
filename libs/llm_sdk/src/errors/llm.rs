@@ -71,7 +71,9 @@ impl Into<ErrorEventContent> for LLMError {
                 LLMError::MissingAPIKey => {
                     "Missing API key. Please provide in config file or environment variable.".into()
                 }
-                LLMError::ConversionError(e) => format!("Error converting between API formats: {}", e),
+                LLMError::ConversionError(e) => {
+                    format!("Error converting between API formats: {}", e)
+                }
                 LLMError::Generic(e) => e,
             },
         }

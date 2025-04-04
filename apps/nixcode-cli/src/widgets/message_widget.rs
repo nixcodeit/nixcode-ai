@@ -20,7 +20,9 @@ impl MessageWidget {
 
         for (key, value) in obj {
             let formatted_value = match value {
-                Value::String(s) if s.len() > 100 || s.contains("\n") => "[long content]".to_string(),
+                Value::String(s) if s.len() > 100 || s.contains("\n") => {
+                    "[long content]".to_string()
+                }
                 Value::String(s) => serde_json::to_string(s).unwrap_or(format!("\"{}\"", s)),
                 Value::Number(n) => n.to_string(),
                 Value::Bool(b) => b.to_string(),
@@ -71,10 +73,8 @@ impl MessageWidget {
                     }
 
                     let mut lines: Vec<Line> = vec![];
-                    let x: Vec<String> = text
-                        .split("\n")
-                        .map(|x| x.trim_end().to_string())
-                        .collect();
+                    let x: Vec<String> =
+                        text.split("\n").map(|x| x.trim_end().to_string()).collect();
 
                     for i in 0..x.len() {
                         if i == 0 {

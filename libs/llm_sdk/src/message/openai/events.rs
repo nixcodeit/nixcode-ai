@@ -32,9 +32,9 @@ impl TryInto<ContentDelta> for OpenAIDelta {
 
     fn try_into(self) -> Result<ContentDelta, LLMError> {
         if let Some(content) = self.content {
-            return Ok(ContentDelta::TextDelta(crate::message::content::text::ContentTextDelta {
-                text: content,
-            }))
+            return Ok(ContentDelta::TextDelta(
+                crate::message::content::text::ContentTextDelta { text: content },
+            ));
         } else if let Some(tool_calls) = self.tool_calls {
             if tool_calls.is_empty() {
                 return Err(LLMError::ParseError("Empty tool calls".to_string()));
@@ -45,9 +45,11 @@ impl TryInto<ContentDelta> for OpenAIDelta {
 
             let tool_content = tool_calls[0].clone();
 
-            return Ok(ContentDelta::InputJsonDelta(crate::message::content::tools::ContentInputJsonDelta {
-                partial_json: tool_content.function.arguments
-            }))
+            return Ok(ContentDelta::InputJsonDelta(
+                crate::message::content::tools::ContentInputJsonDelta {
+                    partial_json: tool_content.function.arguments,
+                },
+            ));
         }
 
         Err(LLMError::ParseError("No content or tool calls".to_string()))

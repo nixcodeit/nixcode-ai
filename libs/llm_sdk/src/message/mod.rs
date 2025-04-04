@@ -1,9 +1,9 @@
+pub mod anthropic;
 pub mod content;
 pub mod message;
+pub mod openai;
 pub mod response;
 pub mod usage;
-pub mod anthropic;
-pub mod openai;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct MessageDelta {

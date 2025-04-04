@@ -4,11 +4,11 @@ use crate::user_input::UserSingleLineInput;
 use crate::widgets::message_widget::MessageWidget;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use nixcode::Nixcode;
+use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::message::Message;
 use nixcode_llm_sdk::message::message::Message::User;
 use nixcode_llm_sdk::message::usage::Usage;
-use nixcode_llm_sdk::ErrorContent;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -33,7 +33,7 @@ pub struct Chat {
     total_lines: usize, // Keep track of total line count
     usage: Usage,
     waiting: bool,
-    error: Option<ErrorContent>,
+    error: Option<ErrorEventContent>,
 }
 
 impl Chat {
@@ -359,7 +359,7 @@ impl Chat {
         self.update_chat_widgets().await;
     }
 
-    pub async fn on_error(&mut self, error: ErrorContent) {
+    pub async fn on_error(&mut self, error: ErrorEventContent) {
         self.error = Some(error);
         self.update_chat_widgets().await;
     }

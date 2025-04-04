@@ -2,7 +2,10 @@ use crate::client::request::Request;
 use crate::client::LLMClientImpl;
 use crate::config::LLMConfig;
 use crate::errors::llm::LLMError;
-use crate::message::anthropic::events::{ContentBlockDeltaEventContent, ContentBlockStartEventContent, ContentBlockStopEventContent, ErrorEventContent, MessageResponseStreamEvent};
+use crate::message::anthropic::events::{
+    ContentBlockDeltaEventContent, ContentBlockStartEventContent, ContentBlockStopEventContent,
+    ErrorEventContent, MessageResponseStreamEvent,
+};
 use crate::message::content::tools::ToolUseContent;
 use crate::message::content::{Content, ContentDelta};
 use crate::message::message::Message;
@@ -36,7 +39,9 @@ impl OpenAIClient {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "Authorization",
-            format!("Bearer {}", options.api_key.expose_secret()).parse().unwrap(),
+            format!("Bearer {}", options.api_key.expose_secret())
+                .parse()
+                .unwrap(),
         );
         headers.insert(
             reqwest::header::CONTENT_TYPE,
@@ -70,76 +75,78 @@ impl OpenAIClient {
 
     // Convert our internal request format to OpenAI format
     fn request_to_openai(&self, request: &Request) -> Value {
-        let messages = request.get_messages().iter().flat_map(|msg| {
-            let role = match msg {
-                Message::User(_) => "user",
-                Message::Assistant(_) => "assistant",
-                Message::System(_) => "system",
-            };
+        let messages = request
+            .get_messages()
+            .iter()
+            .flat_map(|msg| {
+                let role = match msg {
+                    Message::User(_) => "user",
+                    Message::Assistant(_) => "assistant",
+                    Message::System(_) => "system",
+                };
 
-            let mut tool_use = false;
-            let mut tool_calls = vec![];
-            let mut tools = vec![];
-            // Convert content to OpenAI format
-            let content = msg.get_content().iter().filter_map(|content| {
-                match content {
-                    Content::Text(text) => {
-                        Some(json!({ "type": "text", "text": text.text }))
-                    },
-                    Content::Image(img) => {
-                        Some(json!({
+                let mut tool_use = false;
+                let mut tool_calls = vec![];
+                let mut tools = vec![];
+                // Convert content to OpenAI format
+                let content = msg
+                    .get_content()
+                    .iter()
+                    .filter_map(|content| match content {
+                        Content::Text(text) => Some(json!({ "type": "text", "text": text.text })),
+                        Content::Image(img) => Some(json!({
                             "type": "image_url",
                             "image_url": {
                                 "url": "image_url_would_be_here",
                                 "detail": "auto"
                             }
-                        }))
-                    },
-                    Content::ToolUse(content) => {
-                        tool_use = true;
-                        tool_calls.push(json!({
-                            "type": "function",
-                            "id": content.id,
-                            "function": {
-                                "name": content.name,
-                                "arguments": serde_json::to_string(&content.input).unwrap(),
-                            }
-                        }));
-                        None
-                    },
-                    Content::ToolResult(content) => {
-                        tools.push(json!({
-                            "role": "tool",
-                            "content": content.get_content(),
-                            "tool_call_id": content.get_tool_use_id(),
-                        }));
-                        None
-                    }
-                    _ => None,
-                }
-            }).collect::<Vec<_>>();
+                        })),
+                        Content::ToolUse(content) => {
+                            tool_use = true;
+                            tool_calls.push(json!({
+                                "type": "function",
+                                "id": content.id,
+                                "function": {
+                                    "name": content.name,
+                                    "arguments": serde_json::to_string(&content.input).unwrap(),
+                                }
+                            }));
+                            None
+                        }
+                        Content::ToolResult(content) => {
+                            tools.push(json!({
+                                "role": "tool",
+                                "content": content.get_content(),
+                                "tool_call_id": content.get_tool_use_id(),
+                            }));
+                            None
+                        }
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-            let mut msgs = vec![];
-            if content.len() > 0 {
-                msgs.push(json!({
-                    "role": role,
-                    "content": content,
-                }));
-            }
-            if tool_calls.len() > 0 {
-                msgs.push(json!({
-                    "role": role,
-                    "tool_calls": tool_calls,
-                }));
-            }
-            
-            if tools.len() > 0 {
-                msgs.extend(tools);
-            }
-            
-            msgs
-        }).collect::<Vec<_>>();
-        
+                let mut msgs = vec![];
+                if content.len() > 0 {
+                    msgs.push(json!({
+                        "role": role,
+                        "content": content,
+                    }));
+                }
+                if tool_calls.len() > 0 {
+                    msgs.push(json!({
+                        "role": role,
+                        "tool_calls": tool_calls,
+                    }));
+                }
+
+                if tools.len() > 0 {
+                    msgs.extend(tools);
+                }
+
+                msgs
+            })
+            .collect::<Vec<_>>();
+
         // Add system message if present
         let mut all_messages = Vec::new();
         if let Some(system) = request.get_system() {
@@ -149,24 +156,27 @@ impl OpenAIClient {
             }));
         }
         all_messages.extend(messages);
-        
+
         // Convert tool definitions if present
         let tools = if let Some(tools) = request.get_tools() {
-            let openai_tools = tools.iter().map(|tool| {
-                json!({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.input
-                    }
+            let openai_tools = tools
+                .iter()
+                .map(|tool| {
+                    json!({
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.input
+                        }
+                    })
                 })
-            }).collect::<Vec<_>>();
+                .collect::<Vec<_>>();
             Some(openai_tools)
         } else {
             None
         };
-        
+
         // Build the final request
         let mut openai_request = json!({
             "model": request.get_model(),
@@ -178,14 +188,14 @@ impl OpenAIClient {
             // "temperature": request.get_temperature(),
             "max_completion_tokens": request.get_max_tokens(),
         });
-        
+
         // // Add tools if present
         if let Some(tools) = tools {
             openai_request["tools"] = json!(tools);
             openai_request["tool_choice"] = json!("auto");
             openai_request["parallel_tool_calls"] = json!(false);
         }
-        
+
         openai_request
     }
 }
@@ -193,13 +203,13 @@ impl OpenAIClient {
 impl LLMClientImpl for OpenAIClient {
     async fn count_tokens(&self, request: Request) -> Result<u32, LLMError> {
         let openai_body = self.request_to_openai(&request);
-        
+
         // OpenAI doesn't have a direct token counting endpoint like Anthropic,
         // so we'll just use tiktoken or a similar approach to count tokens
         // For now, we'll simulate with a simplified calculation
         let request_json = serde_json::to_string(&openai_body).unwrap();
         let estimated_tokens = request_json.len() / 4; // Very rough approximation
-        
+
         Ok(estimated_tokens as u32)
     }
 
@@ -210,8 +220,11 @@ impl LLMClientImpl for OpenAIClient {
         let openai_body = self.request_to_openai(&request);
 
         log::debug!("Original request: {:?}", request);
-        log::debug!("OpenAI request body: {}", serde_json::to_string_pretty(&openai_body).unwrap());
-        
+        log::debug!(
+            "OpenAI request body: {}",
+            serde_json::to_string_pretty(&openai_body).unwrap()
+        );
+
         let response = self
             .client
             .post("https://api.openai.com/v1/chat/completions")
@@ -233,7 +246,7 @@ impl LLMClientImpl for OpenAIClient {
         }
 
         let (tx, rx) = unbounded_channel::<MessageResponseStreamEvent>();
-        
+
         // Start a task to process the streaming response
         tokio::spawn(async move {
             let mut stream = response.bytes_stream().eventsource();
@@ -245,7 +258,10 @@ impl LLMClientImpl for OpenAIClient {
                 match chunk {
                     Ok(event) => {
                         if let Ok(val) = serde_json::from_str::<Value>(event.data.as_str()) {
-                            log::debug!("SSE event value: {}", serde_json::to_string_pretty(&val).unwrap());
+                            log::debug!(
+                                "SSE event value: {}",
+                                serde_json::to_string_pretty(&val).unwrap()
+                            );
                         } else {
                             log::debug!("SSE event: {:?}", event.data);
                         }
@@ -262,15 +278,21 @@ impl LLMClientImpl for OpenAIClient {
                             continue;
                         }
 
-                        let stream_response = serde_json::from_str::<OpenAIStreamResponse>(event.data.as_str());
+                        let stream_response =
+                            serde_json::from_str::<OpenAIStreamResponse>(event.data.as_str());
                         if let Err(e) = stream_response {
-                            log::debug!("====\nError parsing stream response: {:?}\n{:?}\n=====", event.data, e);
+                            log::debug!(
+                                "====\nError parsing stream response: {:?}\n{:?}\n=====",
+                                event.data,
+                                e
+                            );
                             tx.send(MessageResponseStreamEvent::Error {
                                 error: ErrorEventContent {
                                     message: e.to_string(),
                                     r#type: "ParsingError".into(),
                                 },
-                            }).ok();
+                            })
+                            .ok();
                             continue;
                         }
 
@@ -316,7 +338,6 @@ impl LLMClientImpl for OpenAIClient {
                                     continue;
                                 }
 
-
                                 let delta = ContentDelta::TextDelta(
                                     crate::message::content::text::ContentTextDelta {
                                         text: content.clone(),
@@ -324,10 +345,7 @@ impl LLMClientImpl for OpenAIClient {
                                 );
 
                                 let event = MessageResponseStreamEvent::ContentBlockDelta(
-                                    ContentBlockDeltaEventContent {
-                                        index: 0,
-                                        delta,
-                                    },
+                                    ContentBlockDeltaEventContent { index: 0, delta },
                                 );
                                 log::debug!("{:?}", event);
                                 tx.send(event).ok();
@@ -362,14 +380,22 @@ impl LLMClientImpl for OpenAIClient {
                                 if let Some(id) = &tool_call.id {
                                     let content = ToolUseContent {
                                         id: id.clone(),
-                                        name: String::from(tool_call.function.name.as_ref().unwrap_or(&"".to_string())),
+                                        name: String::from(
+                                            tool_call
+                                                .function
+                                                .name
+                                                .as_ref()
+                                                .unwrap_or(&"".to_string()),
+                                        ),
                                         ..Default::default()
                                     };
                                     let start_content = ContentBlockStartEventContent {
                                         index: tool_call.index,
                                         content_block: Content::new_tool_use(content),
                                     };
-                                    let evt = MessageResponseStreamEvent::ContentBlockStart(start_content);
+                                    let evt = MessageResponseStreamEvent::ContentBlockStart(
+                                        start_content,
+                                    );
                                     has_pending_end_block = true;
                                     log::debug!("{:?}", evt);
                                     tx.send(evt).ok();
@@ -381,9 +407,10 @@ impl LLMClientImpl for OpenAIClient {
                                             crate::message::content::tools::ContentInputJsonDelta {
                                                 partial_json: tool_call.function.arguments.clone(),
                                             },
-                                        )
+                                        ),
                                     };
-                                    let evt = MessageResponseStreamEvent::ContentBlockDelta(content);
+                                    let evt =
+                                        MessageResponseStreamEvent::ContentBlockDelta(content);
                                     log::debug!("{:?}", evt);
                                     tx.send(evt).ok();
                                 }
@@ -391,9 +418,7 @@ impl LLMClientImpl for OpenAIClient {
 
                             // Create usage information if available
                             let usage = response.usage.map_or_else(
-                                || crate::message::usage::UsageDelta {
-                                    output_tokens: 0,
-                                },
+                                || crate::message::usage::UsageDelta { output_tokens: 0 },
                                 |u| crate::message::usage::UsageDelta {
                                     output_tokens: u.output_tokens,
                                 },
@@ -435,7 +460,6 @@ impl LLMClientImpl for OpenAIClient {
                                 tx.send(event).ok();
                             }
                         };
-
 
                         // let event = MessageResponseStreamEvent::try_from(stream_response);
                         // if let Err(e) = event {
@@ -523,7 +547,8 @@ impl LLMClientImpl for OpenAIClient {
                                 r#type: "StreamError".into(),
                                 message: e.to_string(),
                             },
-                        }).ok();
+                        })
+                        .ok();
                     }
                 };
             }
