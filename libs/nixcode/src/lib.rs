@@ -147,7 +147,7 @@ impl Nixcode {
     pub fn new_with_config(
         project: Project,
         config: Config,
-    ) -> anyhow::Result<NewNixcodeResult, LLMError> {
+    ) -> Result<NewNixcodeResult, LLMError> {
         let provider = &config.llm.default_provider;
 
         // Try to get API key for the provider
@@ -171,6 +171,11 @@ impl Nixcode {
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             },
+            ("open_router", Ok(api_key)) => {
+                let llm_config = LLMConfig::new_openrouter(api_key);
+                let client = LLMClient::new_openai(llm_config)?;
+                Self::new(project, client, config)
+            }
             // Fallback to environment variables for Anthropic
             (_, _) => {
                 let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LLMError::MissingAPIKey)?;

@@ -13,6 +13,7 @@ const DEFAULT_ANTHROPIC_MODEL: &str = "claude-3-7-sonnet-20250219";
 /// Default model for OpenAI
 const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_GROQ_MODEL: &str = "gwen-qwq-32b";
+const DEFAULT_OPENROUTER_MODEL: &str = "deepseek/deepseek-chat-v3-0324";
 
 /// The Config struct represents the application configuration
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -59,6 +60,10 @@ pub struct Providers {
     /// Groq-specific settings
     #[serde(default)]
     pub groq: ProviderSettings,
+
+    /// OpenRouter-specific settings
+    #[serde(default)]
+    pub open_router: ProviderSettings,
 }
 
 /// Settings for a specific provider
@@ -104,7 +109,11 @@ impl Config {
                 groq: ProviderSettings {
                     default_model: Some(DEFAULT_GROQ_MODEL.to_string()),
                     ..Default::default()
-                }
+                },
+                open_router: ProviderSettings {
+                    default_model: Some(DEFAULT_OPENROUTER_MODEL.to_string()),
+                    ..Default::default()
+                },
             },
             tools: ToolsConfig::default(),
         }
@@ -157,6 +166,12 @@ impl Config {
                 .default_model
                 .clone()
                 .unwrap_or_else(|| DEFAULT_GROQ_MODEL.to_string()),
+            "open_router" => self
+                .providers
+                .open_router
+                .default_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OPENROUTER_MODEL.to_string()),
             _ => DEFAULT_ANTHROPIC_MODEL.to_string(),
         }
     }
@@ -195,9 +210,21 @@ impl Config {
                     expand_env_vars(key)
                 } else {
                     // Fall back to environment variable
-                    env::var("OPENAI_API_KEY").map_err(|_| {
+                    env::var("GROQ_API_KEY").map_err(|_| {
                         anyhow::anyhow!(
-                            "OPENAI_API_KEY environment variable not set and not configured"
+                            "GROQ_API_KEY environment variable not set and not configured"
+                        )
+                    })?
+                }
+            }
+            "open_router" => {
+                if let Some(key) = &self.providers.open_router.api_key {
+                    expand_env_vars(key)
+                } else {
+                    // Fall back to environment variable
+                    env::var("OPENROUTER_API_KEY").map_err(|_| {
+                        anyhow::anyhow!(
+                            "OPENROUTER_API_KEY environment variable not set and not configured"
                         )
                     })?
                 }

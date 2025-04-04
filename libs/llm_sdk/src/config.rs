@@ -37,6 +37,15 @@ impl LLMConfig {
         }
     }
 
+    pub fn new_openrouter(api_key: SecretString) -> Self {
+        Self {
+            provider: LLMProvider::OpenRouter,
+            api_key,
+            default_model: LLMProvider::OpenRouter.default_model().to_string(),
+            api_base: Some("https://openrouter.ai/api".to_string()),
+        }
+    }
+
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.default_model = model.into();
         self

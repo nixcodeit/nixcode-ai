@@ -17,6 +17,7 @@ use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use secrecy::ExposeSecret;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::ops::AddAssign;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
@@ -185,7 +186,7 @@ impl OpenAIClient {
             },
             // "temperature": request.get_temperature(),
             "max_completion_tokens": request.get_max_tokens(),
-            "reasoning_format": "hidden"
+            // "reasoning_format": "hidden"
         });
 
         // // Add tools if present
@@ -297,7 +298,7 @@ impl LLMClientImpl for OpenAIClient {
                             };
                             log::debug!("{:?}", event);
                             tx.send(event).ok();
-                            continue;
+                            break;
                         }
 
                         let response = stream_response.unwrap();
@@ -355,7 +356,8 @@ impl LLMClientImpl for OpenAIClient {
                             // }
 
                             // If the delta contains content, it's a content block delta
-                            if let Some(content) = &choice.delta.content {
+                            let content = choice.delta.content.clone().unwrap_or("".into());
+                            if !content.is_empty() {
                                 if !has_any_content {
                                     let start_event = MessageResponseStreamEvent::ContentBlockStart(
                                         ContentBlockStartEventContent {
@@ -411,16 +413,16 @@ impl LLMClientImpl for OpenAIClient {
                                     tx.send(event).ok();
                                     last_content_index = tool_call.index;
                                 }
+                                let tool_call_id = tool_call.id.clone().unwrap_or("".into());
 
-                                if let Some(id) = &tool_call.id {
-                                    let input = serde_json::from_str::<Value>(
-                                        &tool_call.function.arguments,
-                                    ).unwrap_or(Value::Null);
+                                let arguments = tool_call.function.arguments.clone().unwrap_or("".into());
+                                if !tool_call_id.is_empty() {
+                                    let input = serde_json::from_str::<Value>(arguments.as_str()).unwrap_or(Value::Object(Default::default()));
 
                                     let content = ToolUseContent {
-                                        id: id.clone(),
+                                        id: tool_call_id,
                                         input,
-                                        _input_raw: tool_call.function.arguments.clone(),
+                                        _input_raw: arguments,
                                         name: String::from(
                                             tool_call
                                                 .function
@@ -446,7 +448,7 @@ impl LLMClientImpl for OpenAIClient {
                                         index: tool_call.index,
                                         delta: ContentDelta::InputJsonDelta(
                                             crate::message::content::tools::ContentInputJsonDelta {
-                                                partial_json: tool_call.function.arguments.clone(),
+                                                partial_json: arguments,
                                             },
                                         ),
                                     };

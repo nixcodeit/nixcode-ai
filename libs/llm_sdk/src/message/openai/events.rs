@@ -48,7 +48,7 @@ impl TryInto<ContentDelta> for OpenAIDelta {
 
             return Ok(ContentDelta::InputJsonDelta(
                 crate::message::content::tools::ContentInputJsonDelta {
-                    partial_json: tool_content.function.arguments,
+                    partial_json: tool_content.function.arguments.unwrap_or("".into()),
                 },
             ));
         }
@@ -67,7 +67,7 @@ pub struct OpenAIToolCall {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OpenAIFunctionContent {
     pub name: Option<String>,
-    pub arguments: String,
+    pub arguments: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

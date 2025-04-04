@@ -6,6 +6,7 @@ pub enum LLMProvider {
     OpenAI,
     Gemini,
     Groq,
+    OpenRouter
 }
 
 impl LLMProvider {
@@ -15,6 +16,7 @@ impl LLMProvider {
             LLMProvider::OpenAI => "gpt-4o",
             LLMProvider::Gemini => "gemini-pro",
             LLMProvider::Groq => "qwen-qwq-32b",
+            LLMProvider::OpenRouter => "deepseek/deepseek-chat-v3-0324",
         }
     }
 
@@ -29,6 +31,10 @@ impl LLMProvider {
             LLMProvider::OpenAI => vec!["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
             LLMProvider::Gemini => vec!["gemini-pro", "gemini-ultra"],
             LLMProvider::Groq => vec!["qwen-qwq-32b", "qwen-2.5-coder-32b", "llama-3.3-70b-specdec"],
+            LLMProvider::OpenRouter => vec![
+                "deepseek/deepseek-chat-v3-0324",
+                "google/gemini-2.5-pro-exp-03-25:free"
+            ],
         }
     }
 }
