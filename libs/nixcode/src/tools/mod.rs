@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub mod commands;
 pub mod fs;
 pub mod git;
 pub mod glob;

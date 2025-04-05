@@ -9,6 +9,10 @@ use crate::config::Config;
 use crate::events::NixcodeEvent;
 use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
+use crate::tools::commands::cargo_build::CargoBuildTool;
+use crate::tools::commands::cargo_fix::CargoFixTool;
+use crate::tools::commands::cargo_fmt::CargoFmtTool;
+use crate::tools::commands::cargo_test::CargoTestTool;
 use crate::tools::fs::create_file::CreateFileTool;
 use crate::tools::fs::delete_file::DeleteFileTool;
 use crate::tools::fs::read_text_file::ReadTextFileTool;
@@ -107,6 +111,12 @@ impl Nixcode {
                 // tools.add_tool(Arc::new(DeleteTextFilePartialTool {}));
                 tools.add_tool(Arc::new(SearchContentTool {}));
                 tools.add_tool(Arc::new(ReplaceContentTool {}));
+
+                // Add cargo tools
+                tools.add_tool(Arc::new(CargoBuildTool {}));
+                tools.add_tool(Arc::new(CargoFmtTool {}));
+                tools.add_tool(Arc::new(CargoFixTool {}));
+                tools.add_tool(Arc::new(CargoTestTool {}));
 
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));

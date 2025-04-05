@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 nixcode_llm_sdk = { path = "../llm_sdk" }
-tokio = { version = "1.44.1", features = ["fs", "macros", "rt-multi-thread"] }
+tokio = { version = "1.44.1", features = ["fs", "macros", "rt-multi-thread", "process"] }
+tokio-stream = { version = "0.1.17", features = ["full"] }
 reqwest = { version = "0.12.15" }
 eventsource-stream = "0.2.3"
 secrecy = "0.10.3"
