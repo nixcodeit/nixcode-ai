@@ -4,8 +4,7 @@ use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 pub struct CargoBuildProps {

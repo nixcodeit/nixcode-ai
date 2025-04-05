@@ -5,7 +5,6 @@ use crate::tools::commands::run_command;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tokio::process::Command;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
