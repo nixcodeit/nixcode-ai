@@ -50,12 +50,6 @@ impl Content {
         matches!(self, Content::ToolUse(_))
     }
 
-    pub(crate) fn set_tool_state(&mut self, state: tools::ToolUseState) {
-        if let Content::ToolUse(tool_use) = self {
-            tool_use.set_state(state);
-        }
-    }
-
     pub fn validate_content(&self) -> bool {
         match self {
             Content::Text(text) => text.validate_content(),

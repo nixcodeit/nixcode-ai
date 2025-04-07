@@ -2,9 +2,9 @@ use crate::message::anthropic::events::{
     ContentBlockDeltaEventContent, ContentBlockStartEventContent, MessageDeltaEventContent,
     MessageStartEventContent,
 };
-use crate::message::content::tools::ToolUseContent;
+use crate::message::content::tools::{ToolResultContent, ToolUseContent};
 use crate::message::content::{Content, ContentDelta};
-use crate::message::usage::Usage;
+use crate::message::usage::AnthropicUsage;
 use crate::stop_reason::StopReason;
 use serde::{Deserialize, Serialize};
 use std::ops::AddAssign;
@@ -17,7 +17,7 @@ pub struct MessageResponse {
     pub stop_reason: Option<StopReason>,
     pub content: Vec<Content>,
     pub stop_sequence: Option<String>,
-    pub usage: Usage,
+    pub usage: AnthropicUsage,
 }
 
 impl MessageResponse {
@@ -72,18 +72,42 @@ impl MessageResponse {
 
 impl MessageResponse {
     pub fn get_text(&self) -> String {
-        let mut text2 = String::new();
+        self.content
+            .iter()
+            .filter_map(|c| c.get_text())
+            .map(|c| c.get_text())
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
+    pub fn get_reasoning(&self) -> String {
+        self.content
+            .iter()
+            .filter_map(|c| match c {
+                Content::Thinking(thinking) => Some(thinking.clone()),
+                _ => None,
+            })
+            .map(|c| c.get_text())
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
 
-        for content in &self.content {
-            match content {
-                Content::Text(text) => {
-                    text2.push_str(text.text.as_str());
-                }
-                _ => {}
-            }
-        }
-
-        text2
+    pub fn get_tool_calls(&self) -> Vec<ToolUseContent> {
+        self.content
+            .iter()
+            .filter_map(|c| match c {
+                Content::ToolUse(tool_use) => Some(tool_use.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    pub fn get_tool_results(&self) -> Vec<ToolResultContent> {
+        self.content
+            .iter()
+            .filter_map(|c| match c {
+                Content::ToolResult(tool_result) => Some(tool_result.clone()),
+                _ => None,
+            })
+            .collect()
     }
 }
 

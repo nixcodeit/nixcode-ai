@@ -1,23 +1,21 @@
-use crate::client::LLMClientImpl;
+use super::request::prepare_request_body;
+use super::stream::process_stream;
 use crate::client::request::Request;
+use crate::client::LLMClientImpl;
 use crate::config::LLMConfig;
 use crate::errors::llm::LLMError;
-use crate::message::anthropic::events::MessageResponseStreamEvent;
 use crate::message::anthropic::tokens::InputTokens;
+use crate::message::common::llm_message::{LLMEvent, LLMRequest};
 use crate::message::message::Message;
-use crate::message::usage::Usage;
+use crate::message::usage::AnthropicUsage;
 use secrecy::ExposeSecret;
 use std::ops::AddAssign;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use super::request::prepare_request_body;
-use super::stream::process_stream;
-
 /// The Anthropic client implementation for interacting with Anthropic API
-#[derive(Debug)]
 pub struct AnthropicClient {
     /// Total usage statistics for this client
-    total_usages: Usage,
+    total_usages: AnthropicUsage,
     /// Message history
     history: Vec<Message>,
     /// HTTP client for API requests
@@ -54,13 +52,13 @@ impl AnthropicClient {
         Ok(AnthropicClient {
             client: reqwest_client,
             history: Vec::new(),
-            total_usages: Usage::default(),
+            total_usages: AnthropicUsage::default(),
             config: options,
         })
     }
 
     /// Get the total usage statistics for this client
-    pub fn get_usage(&self) -> Usage {
+    pub fn get_usage(&self) -> AnthropicUsage {
         self.total_usages.clone()
     }
 
@@ -71,7 +69,8 @@ impl AnthropicClient {
 }
 
 impl LLMClientImpl for AnthropicClient {
-    async fn count_tokens(&self, request: Request) -> Result<u32, LLMError> {
+    async fn count_tokens(&self, request: LLMRequest) -> Result<u32, LLMError> {
+        let request = Request::try_from(&request)?;
         let body = serde_json::to_value(&request)
             .map_err(|e| LLMError::ParseError(format!("Failed to serialize request: {}", e)))?;
 
@@ -90,16 +89,15 @@ impl LLMClientImpl for AnthropicClient {
             ));
         }
 
-        let body = response.json::<InputTokens>().await
+        let body = response
+            .json::<InputTokens>()
+            .await
             .map_err(|e| LLMError::InvalidResponse(e.to_string()))?;
 
         Ok(body.input_tokens)
     }
 
-    async fn send(
-        &self,
-        request: Request,
-    ) -> Result<UnboundedReceiver<MessageResponseStreamEvent>, LLMError> {
+    async fn send(&self, request: LLMRequest) -> Result<UnboundedReceiver<LLMEvent>, LLMError> {
         // Prepare request body with cache control if needed
         let body = prepare_request_body(&request)?;
 
@@ -121,7 +119,7 @@ impl LLMClientImpl for AnthropicClient {
         }
 
         // Process the response stream
-        Ok(process_stream(response).await)
+        Ok(process_stream(request.model, response).await)
     }
 
     fn get_config(&self) -> LLMConfig {

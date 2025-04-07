@@ -24,10 +24,6 @@ pub struct ToolUseContent {
     #[serde(default = "default_value")]
     #[serde(skip_serializing)]
     pub _input_raw: String,
-    #[serde(skip)]
-    pub _tool_execution_state: ToolUseState,
-    #[serde(skip)]
-    pub _tool_result: Value,
 }
 
 impl ToolUseContent {
@@ -54,14 +50,6 @@ impl ToolUseContent {
         self.id.clone()
     }
 
-    pub fn get_state(&self) -> ToolUseState {
-        self._tool_execution_state.clone()
-    }
-
-    pub(crate) fn set_state(&mut self, state: ToolUseState) {
-        self._tool_execution_state = state;
-    }
-
     pub fn validate_content(&self) -> bool {
         !self.input.is_null()
     }
@@ -81,8 +69,8 @@ impl AddAssign<ContentInputJsonDelta> for ToolUseContent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ToolResultContent {
-    tool_use_id: String,
-    content: String,
+    pub tool_use_id: String,
+    pub content: String,
 }
 
 impl ToolResultContent {

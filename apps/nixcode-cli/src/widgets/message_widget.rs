@@ -1,12 +1,49 @@
 use crate::utils::highlights::highlight_code;
-use nixcode_llm_sdk::message::content::tools::ToolUseState;
-use nixcode_llm_sdk::message::content::Content;
-use nixcode_llm_sdk::message::message::Message;
+use nixcode_llm_sdk::message::common::llm_message::LLMMessage;
 use ratatui::prelude::*;
 use ratatui::text::Line;
 use serde_json::Value;
 
 pub struct MessageWidget {}
+
+fn format_text(text: String, author: Option<Span>) -> Vec<Line> {
+    let parsed_text = highlight_code(text.clone(), "md");
+
+    if let Ok(mut t) = parsed_text {
+        if t.len() > 0 {
+            let first_lane = t.get_mut(0).unwrap();
+            let mut spans = if let Some(author) = author.clone() {
+                vec![author.clone()]
+            } else {
+                vec![]
+            };
+            spans.extend(first_lane.clone().spans);
+            *first_lane = Line::from(spans);
+        }
+
+        t.push(Line::from(vec![]));
+
+        return t;
+    }
+
+    let mut lines: Vec<Line> = vec![];
+    let x: Vec<String> = text.split("\n").map(|x| x.trim_end().to_string()).collect();
+
+    for i in 0..x.len() {
+        if i == 0 {
+            if let Some(author) = author.clone() {
+                lines.push(Line::from(vec![author, Span::raw(x[i].clone())]));
+                continue;
+            }
+        }
+
+        lines.push(Line::from(x[i].clone()));
+    }
+
+    lines.push(Line::from(vec![]));
+
+    lines
+}
 
 impl MessageWidget {
     // Helper function to format tool parameters
@@ -36,112 +73,58 @@ impl MessageWidget {
         formatted_params.join(", ")
     }
 
-    pub fn get_lines<'a>(message: Message) -> Vec<Line<'a>> {
-        let author = match message {
-            Message::User { .. } => Span::styled("You > ", Style::new().green()),
-            Message::Assistant { .. } => Span::styled("Assistant > ", Style::new().yellow()),
-            Message::System { .. } => Span::styled("System > ", Style::new().dark_gray()),
+    pub fn get_lines<'a>(message: LLMMessage) -> Vec<Line<'a>> {
+        let author = match message.role.as_str() {
+            "user" => Span::styled("You > ", Style::new().green()),
+            "assistant" => Span::styled("Assistant > ", Style::new().yellow()),
+            "system" | "developer" => Span::styled("System > ", Style::new().dark_gray()),
+            _ => Span::styled("Unknown > ", Style::new().red()),
         }
         .bold();
 
-        let lines: Vec<Line> = message
-            .get_content()
-            .into_iter()
-            .flat_map(|content| match content {
-                Content::Thinking(content) => {
-                    vec![
-                        Line::from(vec![Span::raw("Thinking: "), Span::raw(content.get_text())])
-                            .italic(),
-                        Line::from(vec![]),
-                    ]
+        let mut lines = vec![];
+
+        if let Some(text) = message.reasoning {
+            lines.extend(format_text(text, Some(author.clone())));
+        }
+
+        if let Some(text) = message.text {
+            lines.extend(format_text(text, Some(author.clone())));
+        }
+
+        if let Some(tool_calls) = message.tool_calls {
+            for tool_call in tool_calls {
+                let (name, params) = tool_call.get_execute_params();
+                let formatted_params = Self::format_tool_params(&params);
+                let tool_info = format!("{}({})", name, formatted_params);
+
+                lines.push(Line::from(tool_info).bold());
+            }
+        }
+
+        if let Some(tools_results) = message.tool_results {
+            for tool_result in tools_results {
+                let x = tool_result
+                    .call_id
+                    .unwrap_or_else(|| "unknown id".to_string());
+                let content = tool_result.result;
+                let split_iterator = content.split("\n");
+                let total_lines = split_iterator.clone().count();
+                let mut lines2 = vec![Line::from(Span::raw(format!("[{}] ", x)).bold())];
+
+                split_iterator
+                    .take(5)
+                    .for_each(|line| lines2.push(Line::from(String::from(line))));
+
+                let missing_lines = total_lines.saturating_sub(5);
+                if missing_lines > 0 {
+                    lines2.push(Line::from(format!("... {} more lines", missing_lines)).italic());
                 }
-                Content::Text(text) => {
-                    let text = text.get_text();
-                    let parsed_text = highlight_code(text.clone(), "md");
 
-                    if let Ok(mut t) = parsed_text {
-                        if t.len() > 0 {
-                            let first_lane = t.get_mut(0).unwrap();
-                            let mut spans = vec![author.clone()];
-                            spans.extend(first_lane.clone().spans);
-                            *first_lane = Line::from(spans);
-                        }
-
-                        t.push(Line::from(vec![]));
-
-                        return t;
-                    }
-
-                    let mut lines: Vec<Line> = vec![];
-                    let x: Vec<String> =
-                        text.split("\n").map(|x| x.trim_end().to_string()).collect();
-
-                    for i in 0..x.len() {
-                        if i == 0 {
-                            lines.push(Line::from(vec![author.clone(), Span::raw(x[i].clone())]));
-                            continue;
-                        }
-
-                        lines.push(Line::from(x[i].clone()));
-                    }
-
-                    lines.push(Line::from(vec![]));
-
-                    lines
-                }
-                Content::ToolUse(tool_use) => {
-                    let (_, params) = tool_use.get_execute_params();
-                    let formatted_params = Self::format_tool_params(&params);
-                    let tool_info = if formatted_params.is_empty() {
-                        format!("[{}]", tool_use.get_tool_name())
-                    } else {
-                        format!("[{}]({})", tool_use.get_tool_name(), formatted_params)
-                    };
-
-                    vec![
-                        match tool_use.get_state() {
-                            ToolUseState::Created => {
-                                Line::from(format!("{} waiting", tool_info)).bold()
-                            }
-                            ToolUseState::Executing => {
-                                Line::from(format!("{} executing", tool_info)).bold()
-                            }
-                            ToolUseState::Executed => {
-                                Line::from(format!("{} finished", tool_info)).bold()
-                            }
-                            ToolUseState::Error => {
-                                Line::from(format!("{} failed", tool_info)).bold()
-                            }
-                        },
-                        Line::from(vec![]),
-                    ]
-                }
-                Content::ToolResult(tool_result) => {
-                    let content = tool_result.get_content();
-                    let split_iterator = content.split("\n");
-                    let total_lines = split_iterator.clone().count();
-                    let mut lines = vec![Line::from(Span::raw(format!(
-                        "[{}] ",
-                        tool_result.get_tool_use_id()
-                    )))];
-
-                    split_iterator
-                        .take(5)
-                        .for_each(|line| lines.push(Line::from(String::from(line))));
-
-                    let missing_lines = total_lines.saturating_sub(5);
-                    if missing_lines > 0 {
-                        lines
-                            .push(Line::from(format!("... {} more lines", missing_lines)).italic());
-                    }
-
-                    lines.push(Line::from(vec![]));
-
-                    lines
-                }
-                _ => vec![Line::from("Unknown content type".to_string())],
-            })
-            .collect();
+                lines2.push(Line::from(vec![]));
+                lines.extend(lines2);
+            }
+        }
 
         lines
     }

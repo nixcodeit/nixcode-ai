@@ -3,6 +3,7 @@ pub mod config;
 pub mod errors;
 pub mod json_schema;
 pub mod message;
+pub mod models;
 pub mod providers;
 pub mod stop_reason;
 pub mod tools;

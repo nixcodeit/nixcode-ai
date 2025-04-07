@@ -1,3 +1,5 @@
+use crate::errors::llm::LLMError;
+use crate::message::common::llm_message::LLMRequest;
 use crate::message::content::Content;
 use crate::message::message::Message;
 use crate::tools::Tool;
@@ -19,8 +21,28 @@ pub struct Request {
     tools: Option<Vec<Tool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<Vec<Content>>,
-    #[serde(skip)]
-    _cache: Option<bool>,
+}
+
+impl TryFrom<&LLMRequest> for Request {
+    type Error = LLMError;
+
+    fn try_from(request: &LLMRequest) -> Result<Self, Self::Error> {
+        let mut messages = vec![];
+        for message in request.messages.iter() {
+            messages.push(Message::try_from(message)?);
+        }
+
+        Ok(Request {
+            model: request.model.model_name().to_string(),
+            messages,
+            max_tokens: request.max_tokens,
+            temperature: request.temperature,
+            stream: request.stream,
+            thinking: None,
+            tools: request.tools.clone(),
+            system: request.system.clone().map(|c| vec![Content::new_text(c)]),
+        })
+    }
 }
 
 impl Default for Request {
@@ -34,7 +56,6 @@ impl Default for Request {
             thinking: None,
             tools: None,
             system: None,
-            _cache: None,
         }
     }
 }
@@ -78,15 +99,6 @@ impl Request {
     pub fn with_system_prompt(mut self, system: Vec<Content>) -> Self {
         self.system = Some(system);
         self
-    }
-
-    pub fn with_cache(mut self) -> Self {
-        self._cache = Some(true);
-        self
-    }
-
-    pub fn is_cache_enabled(&self) -> bool {
-        self._cache.unwrap_or(false)
     }
 
     pub fn get_messages(&self) -> &Vec<Message> {

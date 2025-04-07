@@ -1,13 +1,14 @@
 use nixcode_llm_sdk::errors::llm::LLMError;
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent};
+use nixcode_llm_sdk::message::common::llm_message::{ToolCall, ToolResult};
 
+#[derive(Debug)]
 pub enum NixcodeEvent {
     GeneratingResponse,
     GeneratedResponse,
     NewMessage,
     MessageUpdated,
     Error(LLMError),
-    ToolStart(ToolUseContent),
-    ToolEnd(ToolResultContent),
+    ToolStart(ToolCall),
+    ToolEnd(ToolResult),
     ToolsFinished,
 }

@@ -1,4 +1,5 @@
 pub mod anthropic;
+pub mod common;
 pub mod content;
 pub mod message;
 pub mod openai;

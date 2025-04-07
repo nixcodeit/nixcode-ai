@@ -1,40 +1,33 @@
+use crate::models::llm_model::{Gpt4o, Haiku35, LLMModel, Llama4};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub enum LLMProvider {
+    #[default]
     Anthropic,
     OpenAI,
     Gemini,
     Groq,
-    OpenRouter
+    OpenRouter,
 }
 
 impl LLMProvider {
-    pub fn default_model(&self) -> &str {
+    pub fn name(&self) -> &'static str {
         match self {
-            LLMProvider::Anthropic => "claude-3-7-sonnet-20250219",
-            LLMProvider::OpenAI => "gpt-4o",
-            LLMProvider::Gemini => "gemini-pro",
-            LLMProvider::Groq => "qwen-qwq-32b",
-            LLMProvider::OpenRouter => "deepseek/deepseek-chat-v3-0324",
+            LLMProvider::Anthropic => "Anthropic",
+            LLMProvider::OpenAI => "OpenAI",
+            LLMProvider::Gemini => "Gemini",
+            LLMProvider::Groq => "Groq",
+            LLMProvider::OpenRouter => "OpenRouter",
         }
     }
 
-    pub fn available_models(&self) -> Vec<&str> {
+    pub fn default_model(&self) -> &'static LLMModel {
         match self {
-            LLMProvider::Anthropic => vec![
-                "claude-3-opus-20240229",
-                "claude-3-sonnet-20240229",
-                "claude-3-haiku-20240307",
-                "claude-3-7-sonnet-20250219",
-            ],
-            LLMProvider::OpenAI => vec!["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
-            LLMProvider::Gemini => vec!["gemini-pro", "gemini-ultra"],
-            LLMProvider::Groq => vec!["qwen-qwq-32b", "qwen-2.5-coder-32b", "llama-3.3-70b-specdec"],
-            LLMProvider::OpenRouter => vec![
-                "deepseek/deepseek-chat-v3-0324",
-                "google/gemini-2.5-pro-exp-03-25:free"
-            ],
+            LLMProvider::Anthropic => &Haiku35,
+            LLMProvider::OpenAI => &Gpt4o,
+            LLMProvider::Groq => &Llama4,
+            _ => panic!("No default model for provider: {}", self.name()),
         }
     }
 }

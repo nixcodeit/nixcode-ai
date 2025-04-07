@@ -1,38 +1,30 @@
-use crate::client::request::Request;
-use crate::message::content::Content;
-use crate::message::message::Message;
+use crate::message::common::llm_message::{LLMMessage, LLMRequest};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 /// Convert our internal request format to OpenAI format
-pub fn request_to_openai(request: &Request) -> Value {
+pub fn request_to_openai(request: &LLMRequest) -> Value {
     // First convert messages to OpenAI format
     let messages = request
-        .get_messages()
+        .messages
         .iter()
         .flat_map(|msg| convert_message_to_openai(msg))
         .collect::<Vec<_>>();
 
     // Add system message if present
     let mut all_messages = Vec::new();
-    if let Some(system) = request.get_system() {
-        let system_message = system
-            .iter()
-            .flat_map(|x| x.get_text())
-            .map(|x| x.text.clone())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-        if !system_message.is_empty() {
+    if let Some(system) = request.system.clone() {
+        if !system.is_empty() {
             all_messages.push(json!({
                 "role": "system",
-                "content": system_message
+                "content": system
             }));
         }
     }
     all_messages.extend(messages);
 
     // Convert tool definitions if present
-    let tools = request.get_tools().as_ref().map(|tools| {
+    let tools = request.tools.as_ref().map(|tools| {
         tools
             .iter()
             .map(|tool| {
@@ -50,17 +42,17 @@ pub fn request_to_openai(request: &Request) -> Value {
 
     // Build the final request
     let mut openai_request = json!({
-        "model": request.get_model(),
+        "model": request.model.model_name(),
         "messages": all_messages,
         "stream": true,
         "stream_options": {
             "include_usage": true,
         },
-        "max_completion_tokens": request.get_max_tokens(),
+        "max_completion_tokens": request.max_tokens.unwrap_or(1024),
     });
 
     // Add temperature if present
-    if let Some(temperature) = request.get_temperature() {
+    if let Some(temperature) = request.temperature {
         openai_request["temperature"] = json!(temperature);
     }
 
@@ -75,49 +67,48 @@ pub fn request_to_openai(request: &Request) -> Value {
 }
 
 /// Convert a Message to OpenAI format
-pub fn convert_message_to_openai(msg: &Message) -> Vec<Value> {
-    let role = match msg {
-        Message::User(_) => "user",
-        Message::Assistant(_) => "assistant",
-        Message::System(_) => "system",
-    };
-
+pub fn convert_message_to_openai(msg: &LLMMessage) -> Vec<Value> {
     let mut texts = vec![];
-    let mut tool_calls = vec![];
-    let mut tools = vec![];
+    let tool_calls = msg
+        .tool_calls
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .map(|tool| {
+            json!({
+                "function": {
+                    "name": tool.name.clone(),
+                    "arguments": tool.arguments.clone(),
+                },
+                "type": "function",
+                "id": tool.id.clone().unwrap_or_default(),
+            })
+        })
+        .collect::<Vec<Value>>();
+    let tools = msg
+        .tool_results
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .map(|result| {
+            json!({
+                "role": "tool",
+                "content": result.result.clone(),
+                "tool_call_id": result.call_id.clone().unwrap_or_default(),
+            })
+        })
+        .collect::<Vec<Value>>();
+    let role = msg.role.as_str();
 
-    // Process each content item
-    for content in msg.get_content() {
-        match content {
-            Content::Text(text) => {
-                texts.push(json!({
-                    "role": role,
-                    "content": text.text
-                }));
-            },
-            Content::ToolUse(content) => {
-                tool_calls.push(json!({
-                    "type": "function",
-                    "id": content.id,
-                    "function": {
-                        "name": content.name,
-                        "arguments": serde_json::to_string(&content.input).unwrap(),
-                    }
-                }));
-            },
-            Content::ToolResult(content) => {
-                tools.push(json!({
-                    "role": "tool",
-                    "content": content.get_content(),
-                    "tool_call_id": content.get_tool_use_id(),
-                }));
-            },
-            _ => (),
-        }
+    if let Some(text) = msg.text.clone() {
+        texts.push(json!({
+            "role": role,
+            "content": text
+        }));
     }
 
     let mut msgs = vec![];
-    
+
     // Add text messages
     if !texts.is_empty() {
         msgs.extend(texts);

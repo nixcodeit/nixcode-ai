@@ -37,18 +37,17 @@ use crate::tools::search::replace_content::ReplaceContentTool;
 use crate::tools::search::search_content::SearchContentTool;
 use crate::tools::Tools;
 use anyhow::Result;
-use nixcode_llm_sdk::client::request::Request;
+use futures::future::join_all;
 use nixcode_llm_sdk::client::LLMClient;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
-use nixcode_llm_sdk::message::anthropic::events::{ErrorEventContent, MessageResponseStreamEvent};
-use nixcode_llm_sdk::message::content::tools::{ToolResultContent, ToolUseContent, ToolUseState};
+use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
+use nixcode_llm_sdk::message::common::llm_message::{
+    LLMEvent, LLMMessage, LLMRequest,
+};
 use nixcode_llm_sdk::message::content::Content;
-use nixcode_llm_sdk::message::message::Message;
-use nixcode_llm_sdk::message::message::Message::Assistant;
-use nixcode_llm_sdk::message::response::MessageResponse;
-use nixcode_llm_sdk::message::usage::Usage;
-use nixcode_llm_sdk::providers::LLMProvider;
+use nixcode_llm_sdk::message::usage::AnthropicUsage;
+use nixcode_llm_sdk::models::llm_model::LLMModel;
 use secrecy::SecretString;
 use std::default::Default;
 use std::env;
@@ -59,14 +58,11 @@ use tokio::sync::RwLock;
 pub struct Nixcode {
     project: Arc<Project>,
     client: LLMClient,
-    model: String,
+    model: &'static LLMModel,
     tools: Tools,
     config: Config,
-    messages: RwLock<Vec<Message>>,
-    usage: RwLock<Usage>,
-    tools_to_execute: RwLock<Vec<ToolUseContent>>,
-    tools_results: RwLock<Vec<ToolResultContent>>,
-    last_message_response: RwLock<Option<MessageResponse>>,
+    messages: RwLock<Vec<LLMMessage>>,
+    usage: RwLock<AnthropicUsage>,
     llm_error: RwLock<Option<ErrorEventContent>>,
     is_waiting: RwLock<bool>,
     tx: UnboundedSender<NixcodeEvent>,
@@ -91,11 +87,8 @@ impl Nixcode {
             model,
             config: config.clone(),
             messages: RwLock::new(vec![]),
-            usage: RwLock::new(Usage::default()),
+            usage: RwLock::new(AnthropicUsage::default()),
             llm_error: RwLock::new(None),
-            last_message_response: RwLock::new(None),
-            tools_results: RwLock::new(vec![]),
-            tools_to_execute: RwLock::new(vec![]),
             is_waiting: RwLock::new(false),
             tx,
             tools: {
@@ -154,10 +147,7 @@ impl Nixcode {
     }
 
     /// Creates a new Nixcode instance with provided configuration
-    pub fn new_with_config(
-        project: Project,
-        config: Config,
-    ) -> Result<NewNixcodeResult, LLMError> {
+    pub fn new_with_config(project: Project, config: Config) -> Result<NewNixcodeResult, LLMError> {
         let provider = &config.llm.default_provider;
 
         // Try to get API key for the provider
@@ -180,7 +170,7 @@ impl Nixcode {
                 let llm_config = LLMConfig::new_groq(api_key);
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
-            },
+            }
             ("open_router", Ok(api_key)) => {
                 let llm_config = LLMConfig::new_openrouter(api_key);
                 let client = LLMClient::new_openai(llm_config)?;
@@ -217,8 +207,8 @@ impl Nixcode {
         Self::new(project, client, app_config)
     }
 
-    pub fn with_model(mut self, model: impl Into<String>) -> Self {
-        self.model = model.into();
+    pub fn with_model(mut self, model: &'static LLMModel) -> Self {
+        self.model = model;
         self
     }
 
@@ -226,7 +216,7 @@ impl Nixcode {
         *self.is_waiting.read().await
     }
 
-    pub async fn send(self: Arc<Self>, messages: Vec<Message>) {
+    pub async fn send(self: Arc<Self>, messages: Vec<LLMMessage>) {
         let mut system_prompt = vec![Content::new_text(SYSTEM_PROMPT)];
         let project_init_analysis_content = self.project.get_project_init_analysis_content();
         if let Some(content) = project_init_analysis_content {
@@ -234,18 +224,37 @@ impl Nixcode {
             system_prompt.push(Content::new_text(content));
         }
 
-        let mut request = Request::default()
-            .with_model(self.model.clone())
-            .with_max_tokens(16384)
-            .with_messages(messages)
-            .with_system_prompt(system_prompt)
-            // .with_thinking(ThinkingOptions::new(8192))
-            .with_cache();
+        let system = system_prompt
+            .iter()
+            .flat_map(|c| c.get_text())
+            .map(|c| c.text)
+            .collect::<Vec<String>>()
+            .join("\n\n");
+
+        let system = if system.is_empty() {
+            None
+        } else {
+            Some(system)
+        };
+
+        let tools = self.tools.get_enabled_tools(&self.config);
+        let tools = if tools.is_empty() { None } else { Some(tools) };
+
+        let request = LLMRequest {
+            model: self.model,
+            messages,
+            system,
+            max_tokens: Some(8192),
+            temperature: None,
+            tools,
+            stream: true,
+            provider_params: None,
+        };
 
         // Use enabled_tools instead of all tools
         let enabled_tools = self.tools.get_enabled_tools(&self.config);
         if !enabled_tools.is_empty() {
-            request = request.with_tools(enabled_tools);
+            // request = request.with_tools(enabled_tools);
         }
         let nixcode_event_sender = self.tx.clone();
 
@@ -266,41 +275,34 @@ impl Nixcode {
 
         let mut stream = response.unwrap();
 
-        *self.last_message_response.write().await = Some(MessageResponse::default());
-        self.add_message(Assistant(vec![])).await;
+        self.add_message(LLMMessage::new("assistant")).await;
 
         tokio::spawn({
-            let x = self.clone();
+            let nixcode = self.clone();
 
             async move {
                 while let Some(event) = stream.recv().await {
-                    x.handle_response_event(event.clone()).await;
+                    nixcode.handle_response_event(event).await;
                 }
 
                 *self.is_waiting.write().await = false;
                 nixcode_event_sender
                     .send(NixcodeEvent::GeneratedResponse)
                     .ok();
-
-                x.execute_tools().await;
             }
         });
-    }
-
-    pub async fn get_tools_to_execute(self: &Arc<Self>) -> Vec<ToolUseContent> {
-        self.tools_to_execute.read().await.clone()
     }
 
     pub async fn set_waiting(&self, new_val: bool) {
         *self.is_waiting.write().await = new_val;
     }
 
-    async fn add_message(&self, message: Message) {
+    async fn add_message(&self, message: LLMMessage) {
         self.messages.write().await.push(message);
         self.tx.send(NixcodeEvent::NewMessage).ok();
     }
 
-    pub async fn send_message(self: Arc<Self>, message: Option<Message>) {
+    pub async fn send_message(self: Arc<Self>, message: Option<LLMMessage>) {
         if let Some(message) = message {
             self.add_message(message).await;
         }
@@ -308,30 +310,6 @@ impl Nixcode {
         let messages = self.messages.read().await.clone();
 
         self.send(messages).await
-    }
-
-    pub async fn execute_tool(self: Arc<Self>, tool: ToolUseContent) {
-        let (name, props) = tool.get_execute_params();
-
-        if !self.config.is_tool_enabled(name.as_str()) {
-            return;
-        }
-
-        self.clone().start_tool(tool.clone()).await;
-
-        let result = self
-            .tools
-            .execute_tool(name.as_str(), props, self.project.clone())
-            .await;
-
-        let result = if let Ok(value) = result {
-            let value = serde_json::from_value(value).unwrap_or_else(|e| e.to_string());
-            tool.create_response(value)
-        } else {
-            tool.create_response("Error executing tool".to_string())
-        };
-
-        self.clone().tool_finished(result).await;
     }
 
     pub fn has_init_analysis(&self) -> bool {
@@ -342,7 +320,7 @@ impl Nixcode {
         &self.config
     }
 
-    pub fn get_model(&self) -> &str {
+    pub fn get_model(&self) -> &'static LLMModel {
         &self.model
     }
 
@@ -350,7 +328,7 @@ impl Nixcode {
         self.project.clone()
     }
 
-    pub async fn get_messages(&self) -> Vec<Message> {
+    pub async fn get_messages(&self) -> Vec<LLMMessage> {
         self.messages.read().await.clone()
     }
 
@@ -358,98 +336,111 @@ impl Nixcode {
         self.llm_error.read().await.clone()
     }
 
-    pub async fn get_usage(&self) -> Usage {
+    pub async fn get_usage(&self) -> AnthropicUsage {
         self.usage.read().await.clone()
     }
 
     pub async fn send_tools_results(self: Arc<Self>) {
-        let contents = self.tools_results.read().await.clone();
-        self.tools_results.write().await.clear();
-        self.tools_to_execute.write().await.clear();
-
-        let message = Message::User(Content::new_tool_results(contents));
-
-        self.send_message(Some(message)).await;
+        self.send_message(None).await;
     }
 
-    pub async fn handle_response_event(self: &Arc<Self>, message: MessageResponseStreamEvent) {
-        let mut last_message_response = self.last_message_response.write().await;
+    pub async fn handle_response_event(self: &Arc<Self>, message: LLMEvent) {
         let mut messages = self.messages.write().await;
+        let last_message_response = messages.last_mut();
 
         if last_message_response.is_none() || messages.last().is_none() {
+            log::error!("No last response to modify");
             return;
         }
 
-        let mut usage = self.usage.write().await;
         let last_message = messages.last_mut().unwrap();
-        let last_response = last_message_response.as_mut().unwrap();
-        let mut message_updated = false;
+        log::debug!("LLMMESSAGE EVENT {:?}", message);
+
         match message {
-            MessageResponseStreamEvent::MessageStart(msg) => {
-                *last_response += msg;
-                *usage += last_response.usage.clone();
-                message_updated = true;
-                log::debug!("MessageStart: {:?}", last_response);
+            LLMEvent::MessageStart => {}
+            LLMEvent::MessageUpdate(msg) => {
+                *last_message = msg;
+                self.tx.send(NixcodeEvent::MessageUpdated).ok();
             }
-            MessageResponseStreamEvent::MessageDelta(delta) => {
-                usage.output_tokens += delta.usage.output_tokens;
-                *last_response += delta;
-                message_updated = true;
-                log::debug!("MessageDelta: {:?}", last_response);
+            LLMEvent::Error(err) => {
+                *self.llm_error.write().await = Some(err.clone().into());
+                self.tx.send(NixcodeEvent::Error(err)).ok();
             }
-            MessageResponseStreamEvent::ContentBlockStart(content) => {
-                *last_response += content;
-                message_updated = true;
-                log::debug!("ContentBlockStart: {:?}", last_response);
-            }
-            MessageResponseStreamEvent::ContentBlockDelta(delta) => {
-                let index = delta.index;
-                *last_response += delta;
-                log::debug!("ContentBlockDelta: {:?}", last_response);
-
-                match last_response.get_content(index) {
-                    Content::ToolUse(_) => (),
-                    _ => {
-                        message_updated = true;
-                    }
-                }
-            }
-            MessageResponseStreamEvent::ContentBlockStop(content) => {
-                log::debug!("ContentBlockStop: {:?}", last_response);
-                if let Content::ToolUse(tool_use) = last_response.get_content(content.index) {
-                    self.clone().add_tool_to_execute(tool_use).await;
-                }
-                message_updated = true;
-            }
-            MessageResponseStreamEvent::Error { error } => {
-                log::error!("Error: {:?}", error);
-                *self.llm_error.write().await = Some(error.clone());
-            }
-            _ => (),
+            LLMEvent::MessageComplete => {}
         }
-
-        if message_updated {
-            self.tx.send(NixcodeEvent::MessageUpdated).ok();
-        }
-
-        last_message.set_content(last_response.content.clone());
     }
 
-    async fn execute_tools(self: &Arc<Self>) {
-        let tools = self.get_tools_to_execute().await;
+    pub async fn execute_tools(self: &Arc<Self>) {
+        log::debug!("nixcode::execute_tools");
+        let messages = self.messages.read().await;
+        log::debug!("get last message");
+        let message = messages.last();
+        if message.is_none() {
+            log::debug!("message is none");
+            return;
+        }
+        let message = message.unwrap();
 
-        if tools.is_empty() {
+        if message.tool_calls.is_none() {
+            log::debug!("tool_calls is none");
             return;
         }
 
+        let tools = message.tool_calls.clone().unwrap();
+        drop(messages);
+
+        if tools.is_empty() {
+            log::debug!("tool_calls is empty");
+            return;
+        }
+
+        let mut join_handles = vec![];
+        log::debug!("add new user message");
+        self.messages.write().await.push(LLMMessage::user());
+        log::debug!("got last message");
+
         for tool in tools {
-            tokio::spawn({
+            let handle = tokio::spawn({
                 let nixcode = self.clone();
                 async move {
-                    nixcode.execute_tool(tool).await;
+                    log::debug!("Starting task for tool: {:?}", tool);
+                    let (name, props) = tool.get_execute_params();
+
+                    if !nixcode.config.is_tool_enabled(name.as_str()) {
+                        log::warn!("Tool {} is not enabled", name);
+                        return;
+                    }
+
+                    log::debug!("Executing tool: {:?}", tool);
+                    let result = nixcode
+                        .tools
+                        .execute_tool(name.as_str(), props, nixcode.project.clone())
+                        .await;
+
+                    let res = if let Ok(value) = result {
+                        let value = serde_json::from_value(value).unwrap_or_else(|e| e.to_string());
+                        tool.create_response(value)
+                    } else {
+                        tool.create_response("Error executing tool".to_string())
+                    };
+
+                    log::debug!("Tool result: {:?}", res);
+
+                    let mut messages = nixcode.messages.write().await;
+                    let message = messages.last_mut().unwrap();
+                    message.add_tool_result(res);
+                    log::debug!("Tool finished");
+                    drop(messages);
                 }
             });
+
+            join_handles.push(handle);
         }
+
+        log::debug!("Waiting for all tool tasks to finish");
+        join_all(join_handles).await;
+        log::debug!("All tool tasks finished");
+        self.tx.send(NixcodeEvent::ToolsFinished).ok();
     }
 
     pub async fn remove_last_message(self: &Arc<Self>) {
@@ -458,8 +449,8 @@ impl Nixcode {
         }
 
         let mut messages = self.messages.write().await;
-        if let Some(Assistant(content)) = messages.last() {
-            if content.is_empty() {
+        if let Some(message) = messages.last() {
+            if message.is_empty() {
                 messages.pop();
             }
         }
@@ -473,11 +464,8 @@ impl Nixcode {
             return Err(anyhow::anyhow!("Cannot reset while waiting for response"));
         }
 
-        *self.last_message_response.write().await = None;
-        self.tools_results.write().await.clear();
-        self.tools_to_execute.write().await.clear();
         self.messages.write().await.clear();
-        *self.usage.write().await = Usage::default();
+        *self.usage.write().await = AnthropicUsage::default();
         *self.llm_error.write().await = None;
 
         Ok(())
@@ -495,7 +483,7 @@ impl Nixcode {
                 break;
             }
 
-            if let Assistant(_) = last_message.unwrap() {
+            if last_message.unwrap().role == "assistant" {
                 messages.pop();
                 continue;
             }
@@ -509,34 +497,5 @@ impl Nixcode {
 
         drop(messages);
         self.clone().send_message(None).await
-    }
-
-    pub async fn add_tool_to_execute(self: &Arc<Self>, content: ToolUseContent) {
-        self.tools_to_execute.write().await.push(content.clone());
-    }
-
-    pub async fn start_tool(self: &Arc<Self>, tool: ToolUseContent) {
-        let mut messages = self.messages.write().await;
-        let last_message = messages.last_mut().unwrap();
-        last_message.set_tool_state(tool.get_id(), ToolUseState::Executing);
-    }
-
-    pub async fn tool_finished(self: &Arc<Self>, result: ToolResultContent) {
-        let tool_id = result.get_tool_use_id();
-        self.tools_results.write().await.push(result.clone());
-
-        let tools_results = self.tools_results.read().await.clone();
-        let tools_to_execute = self.tools_to_execute.read().await.clone();
-        let mut messages = self.messages.write().await;
-        let last_message = messages.last_mut().unwrap();
-        last_message.set_tool_state(tool_id, ToolUseState::Executed);
-
-        self.tx.send(NixcodeEvent::ToolEnd(result)).ok();
-
-        if tools_results.len() != tools_to_execute.len() {
-            return;
-        }
-
-        self.tx.send(NixcodeEvent::ToolsFinished).ok();
     }
 }

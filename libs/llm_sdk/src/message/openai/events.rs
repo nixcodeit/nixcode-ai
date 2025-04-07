@@ -1,5 +1,6 @@
 use crate::errors::llm::LLMError;
 use crate::message::content::ContentDelta;
+use crate::message::openai::OpenAIUsage;
 use serde::{Deserialize, Serialize};
 
 /// OpenAI's streaming response format
@@ -68,13 +69,4 @@ pub struct OpenAIToolCall {
 pub struct OpenAIFunctionContent {
     pub name: Option<String>,
     pub arguments: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct OpenAIUsage {
-    #[serde(rename = "prompt_tokens")]
-    pub input_tokens: u32,
-    #[serde(rename = "completion_tokens")]
-    pub output_tokens: u32,
-    pub total_tokens: u32,
 }

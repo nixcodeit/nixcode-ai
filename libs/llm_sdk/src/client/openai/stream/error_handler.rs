@@ -1,32 +1,22 @@
+use crate::errors::llm::LLMError;
 use crate::message::anthropic::events::{ErrorEventContent, MessageResponseStreamEvent};
+use crate::message::common::llm_message::LLMEvent;
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Create a parsing error event
-pub fn create_parsing_error(
-    error_message: String,
-    tx: &UnboundedSender<MessageResponseStreamEvent>,
-) {
-    let event = MessageResponseStreamEvent::Error {
-        error: ErrorEventContent {
-            message: error_message,
-            r#type: "ParsingError".into(),
-        },
-    };
+pub fn create_parsing_error(error_message: String, tx: &UnboundedSender<LLMEvent>) {
+    let event = LLMEvent::Error(LLMError::Generic(format!(
+        "Parsing error: {:?}",
+        error_message
+    )));
     log::debug!("{:?}", event);
     tx.send(event).ok();
 }
 
 /// Create a stream error event
-pub fn create_stream_error(
-    error_message: String,
-    tx: &UnboundedSender<MessageResponseStreamEvent>,
-) {
-    let event = MessageResponseStreamEvent::Error {
-        error: ErrorEventContent {
-            r#type: "StreamError".into(),
-            message: error_message,
-        },
-    };
+pub fn create_stream_error(error_message: String, tx: &UnboundedSender<LLMEvent>) {
+    let msg = format!("Stream error: {}", error_message);
+    let event = LLMEvent::Error(LLMError::Generic(msg));
     log::debug!("{:?}", event);
     tx.send(event).ok();
 }

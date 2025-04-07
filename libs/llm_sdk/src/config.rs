@@ -1,11 +1,12 @@
+use crate::models::llm_model::LLMModel;
 use crate::providers::LLMProvider;
 use secrecy::SecretString;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LLMConfig {
     pub provider: LLMProvider,
     pub api_key: SecretString,
-    pub default_model: String,
+    pub default_model: &'static LLMModel,
     pub api_base: Option<String>,
 }
 
@@ -14,7 +15,7 @@ impl LLMConfig {
         Self {
             provider: LLMProvider::Anthropic,
             api_key,
-            default_model: LLMProvider::Anthropic.default_model().to_string(),
+            default_model: LLMProvider::Anthropic.default_model(),
             api_base: None,
         }
     }
@@ -23,7 +24,7 @@ impl LLMConfig {
         Self {
             provider: LLMProvider::OpenAI,
             api_key,
-            default_model: LLMProvider::OpenAI.default_model().to_string(),
+            default_model: LLMProvider::OpenAI.default_model(),
             api_base: Some("https://api.openai.com".to_string()),
         }
     }
@@ -32,7 +33,7 @@ impl LLMConfig {
         Self {
             provider: LLMProvider::Groq,
             api_key,
-            default_model: LLMProvider::Groq.default_model().to_string(),
+            default_model: LLMProvider::Groq.default_model(),
             api_base: Some("https://api.groq.com/openai".to_string()),
         }
     }
@@ -41,13 +42,8 @@ impl LLMConfig {
         Self {
             provider: LLMProvider::OpenRouter,
             api_key,
-            default_model: LLMProvider::OpenRouter.default_model().to_string(),
+            default_model: LLMProvider::OpenRouter.default_model(),
             api_base: Some("https://openrouter.ai/api".to_string()),
         }
-    }
-
-    pub fn with_model(mut self, model: impl Into<String>) -> Self {
-        self.default_model = model.into();
-        self
     }
 }

@@ -1,5 +1,7 @@
 use anyhow::Result;
 use directories::ProjectDirs;
+use nixcode_llm_sdk::models::llm_model::LLMModel;
+use nixcode_llm_sdk::providers::LLMProvider;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -140,39 +142,13 @@ impl Config {
     }
 
     /// Get the model to use for a provider
-    pub fn get_model_for_provider(&self, provider: &str) -> String {
-        // First check if there's a default model configured at the top level
-        if let Some(model) = &self.llm.default_model {
-            return model.clone();
-        }
-
-        // Then check for provider-specific default
+    pub fn get_model_for_provider(&self, provider: &str) -> &'static LLMModel {
         match provider {
-            "anthropic" => self
-                .providers
-                .anthropic
-                .default_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_ANTHROPIC_MODEL.to_string()),
-            "openai" => self
-                .providers
-                .openai
-                .default_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_OPENAI_MODEL.to_string()),
-            "groq" => self
-                .providers
-                .groq
-                .default_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_GROQ_MODEL.to_string()),
-            "open_router" => self
-                .providers
-                .open_router
-                .default_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_OPENROUTER_MODEL.to_string()),
-            _ => DEFAULT_ANTHROPIC_MODEL.to_string(),
+            "anthropic" => LLMProvider::Anthropic.default_model(),
+            "openai" => LLMProvider::OpenAI.default_model(),
+            "groq" => LLMProvider::Groq.default_model(),
+            "open_router" => LLMProvider::OpenRouter.default_model(),
+            _ => LLMProvider::Anthropic.default_model(),
         }
     }
 
@@ -204,7 +180,7 @@ impl Config {
                         )
                     })?
                 }
-            },
+            }
             "groq" => {
                 if let Some(key) = &self.providers.groq.api_key {
                     expand_env_vars(key)

@@ -149,7 +149,15 @@ impl App {
     }
 
     async fn handle_nixcode_event(&mut self, event: NixcodeEvent) {
+        log::debug!("Received nixcode event: {:?}", event);
         match event {
+            NixcodeEvent::GeneratedResponse => {
+                let nixcode = self.nixcode.clone();
+                tokio::spawn(async move {
+                    nixcode.execute_tools().await;
+                });
+                self.chat_view.update_chat_widgets().await;
+            }
             NixcodeEvent::ToolsFinished => {
                 let nixcode = self.nixcode.clone();
                 tokio::spawn(async move {

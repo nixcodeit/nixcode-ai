@@ -5,10 +5,8 @@ use crate::widgets::message_widget::MessageWidget;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use nixcode::Nixcode;
 use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
-use nixcode_llm_sdk::message::content::Content;
-use nixcode_llm_sdk::message::message::Message;
-use nixcode_llm_sdk::message::message::Message::User;
-use nixcode_llm_sdk::message::usage::Usage;
+use nixcode_llm_sdk::message::common::llm_message::LLMMessage;
+use nixcode_llm_sdk::message::usage::AnthropicUsage;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -31,9 +29,10 @@ pub struct Chat {
     stick_to_bottom: bool,
     scroll: usize,      // Simplified to a single value for vertical scrolling
     total_lines: usize, // Keep track of total line count
-    usage: Usage,
+    usage: AnthropicUsage,
     waiting: bool,
     error: Option<ErrorEventContent>,
+    total_cost: f64,
 }
 
 impl Chat {
@@ -54,9 +53,10 @@ impl Chat {
             stick_to_bottom: true,
             area_size: (0, 0),
             total_lines: 0,
-            usage: Usage::default(),
+            usage: AnthropicUsage::default(),
             waiting: false,
             error: None,
+            total_cost: 0.0,
         }
     }
 
@@ -110,6 +110,11 @@ impl Chat {
             .collect();
 
         self.waiting = self.client.is_waiting().await;
+        self.total_cost = messages
+            .iter()
+            .filter_map(|x| x.usage.clone())
+            .map(|x| x.cost)
+            .sum();
 
         if let Some(error) = llm_error {
             lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
@@ -203,7 +208,7 @@ impl Chat {
         }
     }
 
-    async fn send_message(&mut self, message: Option<Message>) {
+    async fn send_message(&mut self, message: Option<LLMMessage>) {
         let client = self.client.clone();
 
         tokio::spawn(async move {
@@ -221,7 +226,7 @@ impl Chat {
             return;
         }
 
-        let message = User(Content::new_text(message).into());
+        let message = LLMMessage::user().with_text(message.clone()).to_owned();
         self.prompt.flush();
 
         self.send_message(Some(message)).await;
@@ -244,24 +249,16 @@ impl Chat {
         let inner = area.inner(Margin::new(1, 1));
         self.set_area_size((inner.width, inner.height));
 
-        let create_input_cache_cost =
-            self.usage.cache_creation_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 3.75;
-        let read_input_cache_cost =
-            self.usage.cache_read_input_tokens.unwrap_or(0) as f64 / 1_000_000.0 * 0.30;
-        let input_cost = self.usage.input_tokens as f64 / 1_000_000.0 * 3.0;
-        let output_cost = self.usage.output_tokens as f64 / 1_000_000.0 * 15.0;
-        let total_cost = create_input_cache_cost + read_input_cache_cost + input_cost + output_cost;
-
         let cache_write_tokens = self.usage.cache_creation_input_tokens.unwrap_or(0);
         let cache_read_tokens = self.usage.cache_read_input_tokens.unwrap_or(0);
         let input_tokens = self.usage.input_tokens;
         let output_tokens = self.usage.output_tokens;
 
         // Add provider info to the title
-        let provider = &self.client.get_config().llm.default_provider;
-        let model = &self.client.get_model();
+        let model = self.client.get_model();
+        let provider = model.provider().name();
 
-        let mut title_line_spans = vec![Span::from(format!(" Chat [{}/{}]", provider, model))];
+        let mut title_line_spans = vec![Span::from(format!(" Chat [{} / {}]", provider, model))];
 
         if self.client.get_project().has_repo_path() {
             title_line_spans.push(Span::styled(" [git] ", Style::new().green().bold()))
@@ -272,7 +269,7 @@ impl Chat {
         let mut main_area = Block::bordered()
             .title(Line::from(title_line_spans))
             .border_type(BorderType::Rounded)
-            .title_bottom(Line::raw(format!(" ${:.4} ", total_cost)).right_aligned())
+            .title_bottom(Line::raw(format!(" ${:.4} ", self.total_cost)).right_aligned())
             .title_bottom(
                 Line::raw(format!(
                     " Cache (R/W): ({}, {}), Input: {}, Output: {} ",
@@ -342,7 +339,7 @@ impl Chat {
         self.vertical_scroll_state = ScrollbarState::default();
         self.scroll = 0;
         self.total_lines = 0;
-        self.usage = Usage::default();
+        self.usage = AnthropicUsage::default();
     }
 
     /// Retry last message that was sent by the user
