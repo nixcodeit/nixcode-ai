@@ -349,6 +349,10 @@ impl From<OpenAIResponse> for LLMMessage {
                 "function_call" => Some(StopReason::ToolUse),
                 _ => None,
             });
+        let reasoning = response
+            .choices
+            .first()
+            .map(|choice| choice.message.reasoning.clone());
         let text = response
             .choices
             .first()
@@ -368,7 +372,7 @@ impl From<OpenAIResponse> for LLMMessage {
         LLMMessage {
             role: "assistant".to_string(),
             text,
-            reasoning: None,
+            reasoning,
             tool_calls,
             tool_results,
             media: None,

@@ -42,9 +42,7 @@ use nixcode_llm_sdk::client::LLMClient;
 use nixcode_llm_sdk::config::LLMConfig;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
-use nixcode_llm_sdk::message::common::llm_message::{
-    LLMEvent, LLMMessage, LLMRequest,
-};
+use nixcode_llm_sdk::message::common::llm_message::{LLMEvent, LLMMessage, LLMRequest};
 use nixcode_llm_sdk::message::content::Content;
 use nixcode_llm_sdk::message::usage::AnthropicUsage;
 use nixcode_llm_sdk::models::llm_model::LLMModel;
@@ -244,7 +242,7 @@ impl Nixcode {
             model: self.model,
             messages,
             system,
-            max_tokens: Some(8192),
+            max_tokens: Some(20000),
             temperature: None,
             tools,
             stream: true,

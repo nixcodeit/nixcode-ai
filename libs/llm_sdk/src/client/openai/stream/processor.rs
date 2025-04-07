@@ -14,6 +14,7 @@ use crate::MessageDelta;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use serde_json::Value;
+use std::time::Duration;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
 /// Process a streaming response from OpenAI
@@ -29,7 +30,6 @@ pub async fn process_stream(
         let mut response = OpenAIResponse::default();
 
         let send_update = |response: OpenAIResponse| {
-            log::debug!("Response: {:?}", response);
             let mut usage = Usage::from(response.usage.clone().unwrap_or_default());
             let usage_cost = model.calculate_cost(usage.clone());
             usage.cost = usage_cost;
@@ -37,24 +37,14 @@ pub async fn process_stream(
             let msg = LLMMessage::from(response).with_usage(usage).to_owned();
 
             let event = LLMEvent::MessageUpdate(msg);
-            log::debug!("{:?}", event);
             tx.send(event).ok();
         };
+
+        let mut last_update_time = std::time::Instant::now();
 
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(event) => {
-                    // Log the event data for debugging
-                    if let Ok(val) = serde_json::from_str::<Value>(event.data.as_str()) {
-                        log::debug!(
-                            "SSE event value: {}",
-                            serde_json::to_string_pretty(&val).unwrap()
-                        );
-                    } else {
-                        log::debug!("SSE event: {:?}", event.data);
-                    }
-
-                    // Skip empty events
                     if event.data.is_empty() {
                         log::debug!("Empty event data, {:?}", event);
                         continue;
@@ -71,12 +61,11 @@ pub async fn process_stream(
                         match serde_json::from_str::<OpenAIStreamResponse>(event.data.as_str()) {
                             Ok(response) => response,
                             Err(e) => {
+                                log::error!("Failed to parse stream response: {:?}", event.data);
                                 create_parsing_error(e.to_string(), &tx);
                                 break;
                             }
                         };
-
-                    log::debug!("OpenAIStreamResponse: {:?}", stream_response);
 
                     match (response.usage.as_mut(), stream_response.usage) {
                         (Some(current_usage), Some(new_usage)) => {
@@ -103,6 +92,11 @@ pub async fn process_stream(
                         response.model = stream_response.model.clone();
                     }
 
+                    let reasoning = match &choice.delta.reasoning {
+                        Some(reasoning) => reasoning.clone(),
+                        None => "".into(),
+                    };
+
                     let content = match &choice.delta.content {
                         Some(content) => content.clone(),
                         None => "".into(),
@@ -118,6 +112,11 @@ pub async fn process_stream(
 
                     if !content.is_empty() {
                         response_choice.message.content += &content;
+                    }
+
+                    if !reasoning.is_empty() {
+                        log::debug!("Received reasoning: {:?}", reasoning);
+                        response_choice.message.reasoning += &reasoning;
                     }
 
                     let tools = match &choice.delta.tool_calls {
@@ -162,13 +161,19 @@ pub async fn process_stream(
                         response_choice.finish_reason = Some(stop_reason.clone());
                     }
 
-                    send_update(response.clone());
+                    // Throttle the updates to avoid flooding the channel
+                    if last_update_time.elapsed() >= Duration::from_millis(100) {
+                        send_update(response.clone());
+                        last_update_time = std::time::Instant::now();
+                    }
                 }
                 Err(e) => {
                     create_stream_error(e.to_string(), &tx);
                 }
             }
         }
+
+        send_update(response.clone());
     });
 
     rx

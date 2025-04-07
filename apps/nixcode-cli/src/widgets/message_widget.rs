@@ -3,10 +3,15 @@ use nixcode_llm_sdk::message::common::llm_message::LLMMessage;
 use ratatui::prelude::*;
 use ratatui::text::Line;
 use serde_json::Value;
+use syntect::util::LinesWithEndings;
 
 pub struct MessageWidget {}
 
 fn format_text(text: String, author: Option<Span>) -> Vec<Line> {
+    if text.is_empty() {
+        return vec![];
+    }
+
     let parsed_text = highlight_code(text.clone(), "md");
 
     if let Ok(mut t) = parsed_text {
@@ -85,7 +90,17 @@ impl MessageWidget {
         let mut lines = vec![];
 
         if let Some(text) = message.reasoning {
-            lines.extend(format_text(text, Some(author.clone())));
+            let mut reasoning_lines = vec![];
+
+            for line_str in LinesWithEndings::from(text.as_str()) {
+                reasoning_lines.push(
+                    Line::from(vec![Span::raw(String::from(line_str))])
+                        .italic()
+                        .gray(),
+                );
+            }
+
+            lines.extend(reasoning_lines);
         }
 
         if let Some(text) = message.text {

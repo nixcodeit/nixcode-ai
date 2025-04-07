@@ -49,8 +49,60 @@ lazy_static! {
         .display_name("Llama 4 Scout")
         .provider(LLMProvider::Groq)
         .build();
-    pub static ref AllModels: Vec<&'static LLMModel> =
-        vec![&Sonnet37, &Haiku35, &Gpt4o, &Gpt3oMini, &Llama4];
+    pub static ref QwenQwq32b: LLMModel = LLMModelBuilder::new()
+        .model_name("qwen-qwq-32b")
+        .display_name("Qwen Qwq 32b")
+        .provider(LLMProvider::Groq)
+        .build();
+    pub static ref QuasarAlpha: LLMModel = LLMModelBuilder::new()
+        .model_name("openrouter/quasar-alpha")
+        .display_name("Quasar Alpha")
+        .provider(LLMProvider::OpenRouter)
+        .build();
+    pub static ref Llama4OpenRouter: LLMModel = LLMModelBuilder::new()
+        .model_name("meta-llama/llama-4-scout")
+        .display_name("Llama 4 Scout")
+        .provider(LLMProvider::OpenRouter)
+        .build();
+    pub static ref Gemini25Pro: LLMModel = LLMModelBuilder::new()
+        .model_name("google/gemini-2.5-pro-preview-03-25")
+        .display_name("Google: Gemini 2.5 Pro Preview")
+        .provider(LLMProvider::OpenRouter)
+        .build();
+    pub static ref DeepSeekV3: LLMModel = LLMModelBuilder::new()
+        .model_name("deepseek/deepseek-chat")
+        .display_name("DeepSeek V3")
+        .cost_calculation(Arc::new(deepseek_v3_cost_calulcation))
+        .provider(LLMProvider::OpenRouter)
+        .build();
+    pub static ref DeepSeekR1: LLMModel = LLMModelBuilder::new()
+        .model_name("deepseek-r1-distill-llama-70b")
+        .display_name("DeepSeek R1")
+        .provider(LLMProvider::Groq)
+        .cost_calculation(Arc::new(deepseek_r1_cost_calculation))
+        .build();
+    pub static ref AllModels: Vec<&'static LLMModel> = vec![
+        &Sonnet37,
+        &Haiku35,
+        &Gpt4o,
+        &Gpt3oMini,
+        &Llama4,
+        &QwenQwq32b,
+        &QuasarAlpha,
+        &Llama4OpenRouter
+    ];
+}
+
+fn deepseek_r1_cost_calculation(usage: Usage) -> f64 {
+    let input_cost = usage.input_tokens as f64 / 1_000_000.0 * 0.75;
+    let output_cost = usage.output_tokens as f64 / 1_000_000.0 * 0.99;
+    input_cost + output_cost
+}
+
+fn deepseek_v3_cost_calulcation(usage: Usage) -> f64 {
+    let input_cost = usage.input_tokens as f64 / 1_000_000.0 * 0.4;
+    let output_cost = usage.output_tokens as f64 / 1_000_000.0 * 0.89;
+    input_cost + output_cost
 }
 
 pub type CostCalculation = Arc<dyn Fn(Usage) -> f64 + Send + Sync>;

@@ -63,7 +63,7 @@ pub async fn process_stream(
                                     log::error!("Error: {:?}", error);
                                     tx.send(LLMEvent::Error(LLMError::Generic(error.message)))
                                         .ok();
-                                    return;
+                                    break;
                                 }
                                 _ => (),
                             }
@@ -82,7 +82,7 @@ pub async fn process_stream(
                         }
                         Err(err) => {
                             tx.send(LLMEvent::Error(err)).ok();
-                            return;
+                            break;
                         }
                     }
                 }
@@ -90,7 +90,7 @@ pub async fn process_stream(
                     let event = LLMEvent::Error(LLMError::InvalidResponse(e.to_string()));
                     log::debug!("StreamError: {:?}", event);
                     tx.send(event).ok();
-                    return;
+                    break;
                 }
             }
         }

@@ -5,8 +5,8 @@ pub mod tokens;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OpenAIPromptTokenDetails {
-    pub cached_tokens: usize,
-    pub audio_tokens: usize,
+    pub cached_tokens: Option<usize>,
+    pub audio_tokens: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -14,7 +14,7 @@ pub struct OpenAIUsage {
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
     pub total_tokens: usize,
-    pub prompt_tokens_details: OpenAIPromptTokenDetails,
+    pub prompt_tokens_details: Option<OpenAIPromptTokenDetails>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -73,6 +73,7 @@ pub struct OpenAIChoice {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OpenAIMessage {
     pub role: String,
+    pub reasoning: String,
     pub content: String,
     pub tool_calls: Vec<OpenAIMessageToolCall>,
 }
