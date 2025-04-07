@@ -1,19 +1,10 @@
 use crate::client::openai::stream::error_handler::{create_parsing_error, create_stream_error};
-use crate::message::anthropic::events::{
-    ContentBlockStopEventContent, MessageDeltaEventContent, MessageResponseStreamEvent,
-    MessageStartEventContent,
-};
 use crate::message::common::llm_message::{LLMEvent, LLMMessage, Usage};
 use crate::message::openai::events::OpenAIStreamResponse;
 use crate::message::openai::{OpenAIChoice, OpenAIMessageToolCall, OpenAIResponse};
-use crate::message::response::MessageResponse;
-use crate::message::usage::UsageDelta;
 use crate::models::llm_model::LLMModel;
-use crate::stop_reason::StopReason;
-use crate::MessageDelta;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use serde_json::Value;
 use std::time::Duration;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 

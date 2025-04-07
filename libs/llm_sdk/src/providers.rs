@@ -1,6 +1,5 @@
 use crate::models::llm_model::{
-    DeepSeekR1, DeepSeekV3, Gemini25Pro, Gpt4o, Haiku35, LLMModel, Llama4, Llama4OpenRouter,
-    QuasarAlpha, QwenQwq32b, Sonnet37,
+    DeepSeekR1, DeepSeekV3, Gpt4o, LLMModel, Sonnet37,
 };
 use serde::{Deserialize, Serialize};
 

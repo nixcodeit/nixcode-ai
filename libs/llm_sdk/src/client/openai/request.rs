@@ -1,6 +1,5 @@
 use crate::message::common::llm_message::{LLMMessage, LLMRequest};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
 /// Convert our internal request format to OpenAI format
 pub fn request_to_openai(request: &LLMRequest) -> Value {
