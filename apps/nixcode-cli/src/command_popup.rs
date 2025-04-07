@@ -37,6 +37,11 @@ const AVAILABLE_COMMANDS: &[CommandInfo] = &[
         aliases: &["remove-last", "remove-last-msg", "remove-msg", "rlm"],
         description: "Remove the last message from the chat",
     },
+    CommandInfo {
+        name: "model",
+        aliases: &["models", "m"],
+        description: "List and select LLM models",
+    },
 ];
 
 /// Represents a command suggestion shown in the popup
@@ -103,6 +108,11 @@ impl CommandPopup {
         let input = input.trim();
         if input.is_empty() {
             return false;
+        }
+
+        // Handle special case of model command with arguments: model <model-name>
+        if input.starts_with("model ") {
+            return true;
         }
 
         AVAILABLE_COMMANDS

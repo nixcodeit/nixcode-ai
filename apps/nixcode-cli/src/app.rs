@@ -1,17 +1,21 @@
 use crate::command_popup::CommandPopup;
 use crate::input_mode::InputMode;
+use crate::model_popup::ModelPopup;
 use crate::utils::highlights::THEME;
 use crate::widgets::chat::Chat;
 use anyhow::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use nixcode::events::NixcodeEvent;
 use nixcode::{NewNixcodeResult, Nixcode};
+use nixcode::project::Project;
 use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
+use nixcode_llm_sdk::models::llm_model::LLMModel;
 use ratatui::prelude::{Color, Modifier, Stylize};
 use ratatui::widgets::Block;
 use ratatui::{DefaultTerminal, Frame};
 use std::sync::Arc;
 use tokio_stream::StreamExt;
+use std::path::PathBuf;
 
 #[allow(dead_code)]
 pub enum AppEvent {
@@ -21,6 +25,8 @@ pub enum AppEvent {
     RetryLastMessage,
     RemoveLastMessage,
     ClearChat,
+    ShowModelPopup,
+    ChangeModel(&'static LLMModel), 
     Quit,
     Render,
     ChatError(ErrorEventContent),
@@ -44,6 +50,8 @@ pub struct App {
     nixcode: Arc<Nixcode>,
 
     command_popup: CommandPopup,
+    model_popup: Option<ModelPopup>,
+    is_changing_model: bool,
 }
 
 impl App {
@@ -60,6 +68,8 @@ impl App {
             should_quit: false,
             current_view: AppView::Chat,
             command_popup: CommandPopup::new(tx.clone()),
+            model_popup: None,
+            is_changing_model: false,
             chat_view: chat,
             nixcode,
             rx,
@@ -69,6 +79,15 @@ impl App {
     }
 
     async fn handle_input_events(&mut self, event: Event) {
+        // If model popup is open, handle its events first
+        if self.model_popup.is_some() {
+            let keep_popup_open = self.model_popup.as_mut().unwrap().handle_input_event(&event);
+            if !keep_popup_open {
+                self.model_popup = None;
+            }
+            return;
+        }
+
         match self.current_view {
             AppView::Chat => {
                 self.chat_view
@@ -182,6 +201,8 @@ impl App {
             AppEvent::RetryLastMessage => self.chat_view.retry_last_message().await,
             AppEvent::ClearChat => self.chat_view.clear_chat().await,
             AppEvent::RemoveLastMessage => self.chat_view.remove_last_message().await,
+            AppEvent::ShowModelPopup => self.show_model_popup(),
+            AppEvent::ChangeModel(model) => self.change_model(model).await,
             AppEvent::ChatError(error) => self.chat_view.on_error(error).await,
         }
     }
@@ -209,7 +230,13 @@ impl App {
             AppView::Chat => self.chat_view.render_frame(frame, main_area),
         }
 
-        frame.render_widget(StatusBar::new(self.input_mode), status_area);
+        // Render model status in status bar including current model
+        frame.render_widget(
+            StatusBar::new(self.input_mode)
+                .with_model(self.nixcode.get_model()),
+            status_area
+        );
+        
         let mut cursor_position: Option<Position> = None;
 
         if let InputMode::Command = self.input_mode {
@@ -224,14 +251,23 @@ impl App {
             cursor_position = Some(Position::new(x, y));
         }
 
+        // Render model popup if it's active
+        if let Some(model_popup) = &self.model_popup {
+            frame.render_widget(Block::new().add_modifier(Modifier::DIM), frame.area());
+            frame.render_widget(model_popup, frame.area());
+            cursor_position = None; // Don't show cursor in model popup
+        }
+
         if let Some(cursor_position) = cursor_position {
             frame.set_cursor_position(cursor_position);
         }
     }
 
     async fn execute_command(&mut self, command: String) {
-        let command = command.trim();
-        match command {
+        let parts: Vec<&str> = command.trim().split_whitespace().collect();
+        let main_command = parts[0];
+
+        match main_command {
             "quit" => self.quit(),
             "clear" => {
                 self.tx.send(AppEvent::ClearChat).ok();
@@ -242,10 +278,61 @@ impl App {
             "remove-last-message" => {
                 self.tx.send(AppEvent::RemoveLastMessage).ok();
             }
-            _ => panic!("Command not implemented: {}", command),
+            "model" => {
+                self.tx.send(AppEvent::ShowModelPopup).ok();
+            }
+            _ => {
+                log::warn!("Command not implemented: {}", command);
+            }
         }
 
         self.set_input_mode(InputMode::Normal);
+    }
+
+    fn show_model_popup(&mut self) {
+        let current_model = self.nixcode.get_model();
+        self.model_popup = Some(ModelPopup::new(self.tx.clone(), current_model));
+    }
+
+    async fn change_model(&mut self, model: &'static LLMModel) {
+        if self.is_changing_model {
+            return; // Prevent concurrent model changes
+        }
+
+        self.is_changing_model = true;
+
+        // Create a new Nixcode instance with the selected model
+        if let Ok(()) = self.nixcode.reset().await {
+            // Create a new Nixcode client with the new model
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let project = Project::new(cwd);
+            let config = self.nixcode.get_config().clone();
+
+            // Create a new client with the same config but different model
+            match Nixcode::new_with_config(project, config) {
+                Ok((new_rx, client)) => {
+                    // Update the client with the new model
+                    let nixcode = Arc::new(client.with_model(model));
+                    
+                    // Update the current Nixcode instance
+                    self.nixcode = nixcode.clone();
+                    self.nixcode_rx = new_rx;
+                    
+                    // Update the chat view with the new Nixcode instance
+                    self.chat_view.update_nixcode(nixcode);
+                    
+                    // Update chat widgets
+                    self.chat_view.update_chat_widgets().await;
+                    
+                    log::info!("Model changed to {}", model);
+                }
+                Err(e) => {
+                    log::error!("Failed to change model: {:?}", e);
+                }
+            }
+        }
+
+        self.is_changing_model = false;
     }
 
     fn quit(&mut self) {

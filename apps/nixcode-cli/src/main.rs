@@ -8,6 +8,7 @@ use std::path::PathBuf;
 mod app;
 mod command_popup;
 mod input_mode;
+mod model_popup;
 mod popup_utils;
 mod status_bar;
 mod user_input;

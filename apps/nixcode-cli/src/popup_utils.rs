@@ -8,3 +8,22 @@ pub fn popup_area(area: Rect, percent_x: u16) -> Rect {
     let [area] = horizontal.areas(area);
     area
 }
+
+/// Helper function to create a centered rect using up certain percentage of the available rect
+pub fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::vertical([
+        Constraint::Length((r.height.saturating_sub(height)) / 2),
+        Constraint::Length(height),
+        Constraint::Length((r.height.saturating_sub(height)) / 2),
+    ])
+    .flex(Flex::Center)
+    .split(r);
+
+    Layout::horizontal([
+        Constraint::Length((r.width.saturating_sub(width)) / 2),
+        Constraint::Length(width),
+        Constraint::Length((r.width.saturating_sub(width)) / 2),
+    ])
+    .flex(Flex::Center)
+    .split(popup_layout[1])[1]
+}

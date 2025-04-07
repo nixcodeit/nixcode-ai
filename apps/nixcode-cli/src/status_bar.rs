@@ -1,4 +1,6 @@
 use crate::input_mode::InputMode;
+use nixcode_llm_sdk::models::llm_model::LLMModel;
+use nixcode_llm_sdk::providers::LLMProvider;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::layout::{Layout, Margin, Rect};
@@ -7,13 +9,20 @@ use ratatui::widgets::Block;
 
 pub struct StatusBar {
     current_mode: InputMode,
+    current_model: Option<&'static LLMModel>,
 }
 
 impl StatusBar {
     pub(crate) fn new(status: InputMode) -> Self {
         StatusBar {
             current_mode: status,
+            current_model: None,
         }
+    }
+
+    pub(crate) fn with_model(mut self, model: &'static LLMModel) -> Self {
+        self.current_model = Some(model);
+        self
     }
 }
 
@@ -32,9 +41,28 @@ impl Widget for StatusBar {
         // Calculate total length of the right side content (date + version)
         let right_content_length = formatted_date.len() + 1 + version_text.len();
 
-        // Create layout with three sections: mode info, fill space, date+version
-        let horizontal = Layout::horizontal([Fill(1), Length(right_content_length as u16)]);
-        let [inner_area, right_area] = horizontal.areas(area.inner(Margin::new(1, 0)));
+        // Create layout with three sections or two sections based on model info availability
+        let horizontal = if self.current_model.is_some() {
+            Layout::horizontal([
+                Length(10), // Mode info fixed width
+                Fill(1),    // Model info takes remaining space
+                Length(right_content_length as u16), // Date+version fixed width
+            ])
+        } else {
+            Layout::horizontal([
+                Fill(1),    // Mode info takes available space
+                Length(right_content_length as u16), // Date+version fixed width
+            ])
+        };
+
+        let inner_margin = area.inner(Margin::new(1, 0));
+        let areas = if self.current_model.is_some() {
+            let areas: [Rect; 3] = horizontal.areas(inner_margin);
+            areas
+        } else {
+            let areas: [Rect; 2] = horizontal.areas(inner_margin);
+            [areas[0], areas[1], Rect::default()] // Add a dummy third area
+        };
 
         Block::new().bg(Color::DarkGray).render(area, buf);
 
@@ -49,19 +77,63 @@ impl Widget for StatusBar {
                     .add_modifier(Modifier::BOLD),
             ),
         ])
-        .render(inner_area, buf);
+        .render(areas[0], buf);
 
-        // Render date and version on the right
-        Line::from(vec![
-            Span::styled(
-                version_text,
-                Style::new()
-                    .fg(Color::LightBlue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" "),
-            Span::from(formatted_date),
-        ])
-        .render(right_area, buf);
+        // Render model info in the middle if available
+        if let Some(model) = self.current_model {
+            let provider_color = match model.provider() {
+                LLMProvider::Anthropic => Color::Rgb(163, 77, 253), // Purple
+                LLMProvider::OpenAI => Color::Rgb(16, 163, 127),    // Green
+                LLMProvider::Groq => Color::Rgb(255, 165, 0),       // Orange
+                LLMProvider::OpenRouter => Color::Rgb(59, 130, 246), // Blue
+                LLMProvider::Gemini => Color::Rgb(234, 67, 53),     // Red
+            };
+
+            let model_line = Line::from(vec![
+                Span::raw("Model: "),
+                Span::styled(
+                    format!(" {} ", model.provider().name()),
+                    Style::new()
+                        .fg(Color::Black)
+                        .bg(provider_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{}", model),
+                    Style::new()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]);
+
+            model_line.render(areas[1], buf);
+
+            // Render date and version on the right (third area)
+            Line::from(vec![
+                Span::styled(
+                    version_text,
+                    Style::new()
+                        .fg(Color::LightBlue)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::from(formatted_date),
+            ])
+            .render(areas[2], buf);
+        } else {
+            // If no model info, render date and version in the second area
+            Line::from(vec![
+                Span::styled(
+                    version_text,
+                    Style::new()
+                        .fg(Color::LightBlue)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::from(formatted_date),
+            ])
+            .render(areas[1], buf);
+        }
     }
 }

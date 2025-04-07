@@ -64,6 +64,11 @@ impl Chat {
         self.input_mode = mode;
     }
 
+    // Add method to update the Nixcode instance
+    pub fn update_nixcode(&mut self, client: Arc<Nixcode>) {
+        self.client = client;
+    }
+
     pub async fn handle_input_events(&mut self, input_mode: InputMode, event: &Event) {
         self.set_input_mode(input_mode);
 
