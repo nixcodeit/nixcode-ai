@@ -3,7 +3,7 @@ use nixcode_llm_sdk::models::llm_model::LLMModel;
 use std::fmt::Debug;
 
 /// Extension trait for LLMModel to provide additional functionality
-pub trait LLMModelExt: Debug {
+pub trait LLMModelExt {
     /// Get the model's original LLMModel reference
     fn as_model(&self) -> &'static LLMModel;
     
