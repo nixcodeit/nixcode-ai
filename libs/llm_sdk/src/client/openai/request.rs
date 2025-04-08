@@ -1,4 +1,5 @@
 use crate::message::common::llm_message::{LLMMessage, LLMRequest};
+use crate::models::llm_model::{Gpt3oMini, LLMModel};
 use serde_json::{json, Value};
 
 /// Convert our internal request format to OpenAI format
@@ -60,6 +61,16 @@ pub fn request_to_openai(request: &LLMRequest) -> Value {
         openai_request["tools"] = json!(tools);
         openai_request["tool_choice"] = json!("auto");
         openai_request["parallel_tool_calls"] = json!(false);
+    }
+
+    match request.model.full_model_name().as_str() {
+        "openai/o3-mini" => {
+            openai_request.as_object_mut().map(|o| {
+                o.remove("parallel_tool_calls");
+                o.remove("temperature");
+            });
+        }
+        _ => (),
     }
 
     openai_request

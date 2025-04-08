@@ -10,13 +10,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use toml;
 
-/// Default model for Anthropic
-const DEFAULT_ANTHROPIC_MODEL: &str = "claude-3-7-sonnet-20250219";
-/// Default model for OpenAI
-const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
-const DEFAULT_GROQ_MODEL: &str = "gwen-qwq-32b";
-const DEFAULT_OPENROUTER_MODEL: &str = "deepseek/deepseek-chat-v3-0324";
-
 /// The Config struct represents the application configuration
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -40,8 +33,8 @@ pub struct LLMSettings {
     #[serde(default = "default_provider")]
     pub default_provider: String,
 
-    /// Default model to use (provider-specific defaults will be used if not specified)
-    pub default_model: Option<String>,
+    #[serde(default)]
+    pub overrides: HashMap<String, bool>,
 }
 
 fn default_provider() -> String {
@@ -73,9 +66,6 @@ pub struct Providers {
 pub struct ProviderSettings {
     /// API key for the provider (can use ${ENV_VAR} syntax)
     pub api_key: Option<String>,
-
-    /// Default model for this provider
-    pub default_model: Option<String>,
 }
 
 /// Tool configuration
@@ -99,24 +89,7 @@ impl Config {
     pub fn new() -> Self {
         Self {
             llm: LLMSettings::default(),
-            providers: Providers {
-                anthropic: ProviderSettings {
-                    default_model: Some(DEFAULT_ANTHROPIC_MODEL.to_string()),
-                    ..Default::default()
-                },
-                openai: ProviderSettings {
-                    default_model: Some(DEFAULT_OPENAI_MODEL.to_string()),
-                    ..Default::default()
-                },
-                groq: ProviderSettings {
-                    default_model: Some(DEFAULT_GROQ_MODEL.to_string()),
-                    ..Default::default()
-                },
-                open_router: ProviderSettings {
-                    default_model: Some(DEFAULT_OPENROUTER_MODEL.to_string()),
-                    ..Default::default()
-                },
-            },
+            providers: Providers::default(),
             tools: ToolsConfig::default(),
         }
     }

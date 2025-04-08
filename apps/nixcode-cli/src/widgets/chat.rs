@@ -119,7 +119,8 @@ impl Chat {
             .iter()
             .filter_map(|x| x.usage.clone())
             .map(|x| x.cost)
-            .sum();
+            .sum::<f64>()
+            .max(0.0);
 
         if let Some(error) = llm_error {
             lines.push(Line::raw(format!("Error: {:?}", error)).red().bold());
@@ -232,7 +233,9 @@ impl Chat {
         }
 
         // Create a regular LLM message
-        let message = LLMMessage::user().with_text(message_text.clone()).to_owned();
+        let message = LLMMessage::user()
+            .with_text(message_text.clone())
+            .to_owned();
         self.prompt.flush();
 
         self.send_message(Some(message)).await;
@@ -255,11 +258,6 @@ impl Chat {
         let inner = area.inner(Margin::new(1, 1));
         self.set_area_size((inner.width, inner.height));
 
-        let cache_write_tokens = self.usage.cache_creation_input_tokens.unwrap_or(0);
-        let cache_read_tokens = self.usage.cache_read_input_tokens.unwrap_or(0);
-        let input_tokens = self.usage.input_tokens;
-        let output_tokens = self.usage.output_tokens;
-
         // Add provider info to the title
         let model = self.client.get_model();
         let provider = model.provider().name();
@@ -275,14 +273,7 @@ impl Chat {
         let mut main_area = Block::bordered()
             .title(Line::from(title_line_spans))
             .border_type(BorderType::Rounded)
-            .title_bottom(Line::raw(format!(" ${:.4} ", self.total_cost)).right_aligned())
-            .title_bottom(
-                Line::raw(format!(
-                    " Cache (R/W): ({}, {}), Input: {}, Output: {} ",
-                    cache_read_tokens, cache_write_tokens, input_tokens, output_tokens
-                ))
-                .centered(),
-            );
+            .title_bottom(Line::raw(format!(" ${:.4} ", self.total_cost)).right_aligned());
 
         if !self.client.has_init_analysis() {
             main_area = main_area.title(

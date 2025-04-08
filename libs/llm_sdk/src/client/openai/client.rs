@@ -1,7 +1,7 @@
 use super::request::request_to_openai;
 use super::stream::process_stream;
 use crate::client::LLMClientImpl;
-use crate::config::LLMConfig;
+use crate::config::HttpClientOptions;
 use crate::errors::llm::LLMError;
 use crate::message::common::llm_message::{LLMEvent, LLMRequest};
 use crate::message::message::Message;
@@ -19,7 +19,7 @@ pub struct OpenAIClient {
     /// HTTP client for API requests
     client: reqwest::Client,
     /// Client configuration
-    config: LLMConfig,
+    config: HttpClientOptions,
 }
 
 impl AddAssign<Message> for OpenAIClient {
@@ -30,7 +30,7 @@ impl AddAssign<Message> for OpenAIClient {
 
 impl OpenAIClient {
     /// Create a new OpenAI client with the given configuration
-    pub fn new(options: LLMConfig) -> anyhow::Result<Self, LLMError> {
+    pub fn new(options: HttpClientOptions) -> anyhow::Result<Self, LLMError> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "Authorization",
@@ -117,7 +117,7 @@ impl LLMClientImpl for OpenAIClient {
         Ok(process_stream(request.model, response).await)
     }
 
-    fn get_config(&self) -> LLMConfig {
+    fn get_config(&self) -> HttpClientOptions {
         self.config.clone()
     }
 }

@@ -36,6 +36,7 @@ pub async fn process_stream(
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(event) => {
+                    log::debug!("Received event: {:?}", event.data);
                     if event.data.is_empty() {
                         log::debug!("Empty event data, {:?}", event);
                         continue;

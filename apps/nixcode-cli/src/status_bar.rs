@@ -4,7 +4,7 @@ use nixcode_llm_sdk::providers::LLMProvider;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::layout::{Layout, Margin, Rect};
-use ratatui::prelude::{Color, Line, Modifier, Span, Style, Stylize, Widget};
+use ratatui::prelude::{Alignment, Color, Line, Modifier, Span, Style, Stylize, Widget};
 use ratatui::widgets::Block;
 
 pub struct StatusBar {
@@ -40,17 +40,30 @@ impl Widget for StatusBar {
 
         // Calculate total length of the right side content (date + version)
         let right_content_length = formatted_date.len() + 1 + version_text.len();
+        // Render the mode info on the left
+        let mode_line = Line::from(vec![
+            Span::raw("Mode: "),
+            Span::styled(
+                format!(" {} ", self.current_mode.to_string()),
+                Style::new()
+                    .fg(Color::Black)
+                    .bg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]);
+
+        let mode_line_width = mode_line.width() + 1;
 
         // Create layout with three sections or two sections based on model info availability
         let horizontal = if self.current_model.is_some() {
             Layout::horizontal([
-                Length(10), // Mode info fixed width
-                Fill(1),    // Model info takes remaining space
+                Length(mode_line_width as u16),      // Mode info fixed width
+                Fill(1),                             // Model info takes remaining space
                 Length(right_content_length as u16), // Date+version fixed width
             ])
         } else {
             Layout::horizontal([
-                Fill(1),    // Mode info takes available space
+                Fill(1),                             // Mode info takes available space
                 Length(right_content_length as u16), // Date+version fixed width
             ])
         };
@@ -66,18 +79,7 @@ impl Widget for StatusBar {
 
         Block::new().bg(Color::DarkGray).render(area, buf);
 
-        // Render the mode info on the left
-        Line::from(vec![
-            Span::raw("Mode: "),
-            Span::styled(
-                format!(" {} ", self.current_mode.to_string()),
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ])
-        .render(areas[0], buf);
+        mode_line.render(areas[0], buf);
 
         // Render model info in the middle if available
         if let Some(model) = self.current_model {
@@ -101,9 +103,7 @@ impl Widget for StatusBar {
                 Span::raw(" "),
                 Span::styled(
                     format!("{}", model),
-                    Style::new()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
+                    Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
                 ),
             ]);
 

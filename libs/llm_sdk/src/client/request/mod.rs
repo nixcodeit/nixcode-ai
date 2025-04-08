@@ -21,6 +21,8 @@ pub struct Request {
     tools: Option<Vec<Tool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<Vec<Content>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop_sequences: Option<Vec<String>>,
 }
 
 impl TryFrom<&LLMRequest> for Request {
@@ -41,6 +43,7 @@ impl TryFrom<&LLMRequest> for Request {
             thinking: None,
             tools: request.tools.clone(),
             system: request.system.clone().map(|c| vec![Content::new_text(c)]),
+            stop_sequences: request.stop_sequences.clone(),
         })
     }
 }
@@ -56,6 +59,7 @@ impl Default for Request {
             thinking: None,
             tools: None,
             system: None,
+            stop_sequences: None,
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::models::llm_model::{
-    DeepSeekR1, DeepSeekV3, Gpt4o, LLMModel, Sonnet37,
+    DeepSeekR1, DeepSeekV3, Gpt3oMini, Gpt4o, LLMModel, Llama4, Sonnet37,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +14,16 @@ pub enum LLMProvider {
 }
 
 impl LLMProvider {
+    pub fn config_key(&self) -> &'static str {
+        match self {
+            LLMProvider::Anthropic => "anthropic",
+            LLMProvider::OpenAI => "openai",
+            LLMProvider::Gemini => "gemini",
+            LLMProvider::Groq => "groq",
+            LLMProvider::OpenRouter => "open_router",
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             LLMProvider::Anthropic => "Anthropic",
@@ -27,8 +37,8 @@ impl LLMProvider {
     pub fn default_model(&self) -> &'static LLMModel {
         match self {
             LLMProvider::Anthropic => &Sonnet37,
-            LLMProvider::OpenAI => &Gpt4o,
-            LLMProvider::Groq => &DeepSeekR1,
+            LLMProvider::OpenAI => &Gpt3oMini,
+            LLMProvider::Groq => &Llama4,
             LLMProvider::OpenRouter => &DeepSeekV3,
             _ => panic!("No default model for provider: {}", self.name()),
         }

@@ -256,6 +256,7 @@ pub struct Media {
     pub metadata: Option<Value>,
 }
 
+#[derive(Clone, Debug)]
 /// Request structure for LLM API calls
 pub struct LLMRequest {
     /// The model to use for this request
@@ -274,6 +275,8 @@ pub struct LLMRequest {
     pub stream: bool,
     /// Provider-specific parameters
     pub provider_params: Option<Value>,
+    // Stop sequences for the model
+    pub stop_sequences: Option<Vec<String>>,
 }
 
 /// Common event structure for all LLM providers

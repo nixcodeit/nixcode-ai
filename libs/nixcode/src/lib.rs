@@ -1,6 +1,5 @@
 pub mod config;
 pub mod events;
-pub mod llm_ext;
 pub mod project;
 mod prompts;
 mod tools;
@@ -8,7 +7,6 @@ mod utils;
 
 use crate::config::Config;
 use crate::events::NixcodeEvent;
-use crate::llm_ext::LLMModelExt;
 use crate::project::Project;
 use crate::prompts::system::SYSTEM_PROMPT;
 use crate::tools::commands::cargo_build::CargoBuildTool;
@@ -41,7 +39,7 @@ use crate::tools::Tools;
 use anyhow::Result;
 use futures::future::join_all;
 use nixcode_llm_sdk::client::LLMClient;
-use nixcode_llm_sdk::config::LLMConfig;
+use nixcode_llm_sdk::config::HttpClientOptions;
 use nixcode_llm_sdk::errors::llm::LLMError;
 use nixcode_llm_sdk::message::anthropic::events::ErrorEventContent;
 use nixcode_llm_sdk::message::common::llm_message::{LLMEvent, LLMMessage, LLMRequest};
@@ -156,23 +154,23 @@ impl Nixcode {
         match (provider.as_str(), api_key_result) {
             // Anthropic with available API key
             ("anthropic", Ok(api_key)) => {
-                let llm_config = LLMConfig::new_anthropic(api_key);
+                let llm_config = HttpClientOptions::new_anthropic(api_key);
                 let client = LLMClient::new_anthropic(llm_config)?;
                 Self::new(project, client, config)
             }
             // OpenAI with available API key
             ("openai", Ok(api_key)) => {
-                let llm_config = LLMConfig::new_openai(api_key);
+                let llm_config = HttpClientOptions::new_openai(api_key);
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }
             ("groq", Ok(api_key)) => {
-                let llm_config = LLMConfig::new_groq(api_key);
+                let llm_config = HttpClientOptions::new_groq(api_key);
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }
             ("open_router", Ok(api_key)) => {
-                let llm_config = LLMConfig::new_openrouter(api_key);
+                let llm_config = HttpClientOptions::new_openrouter(api_key);
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }
@@ -180,7 +178,7 @@ impl Nixcode {
             (_, _) => {
                 let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LLMError::MissingAPIKey)?;
 
-                let llm_config = LLMConfig::new_anthropic(SecretString::from(api_key));
+                let llm_config = HttpClientOptions::new_anthropic(SecretString::from(api_key));
 
                 let client = LLMClient::new_anthropic(llm_config)?;
                 Self::new(project, client, config)
@@ -191,7 +189,7 @@ impl Nixcode {
     // Legacy methods kept for compatibility
     pub fn new_anthropic(
         project: Project,
-        config: LLMConfig,
+        config: HttpClientOptions,
     ) -> anyhow::Result<NewNixcodeResult, LLMError> {
         let app_config = Config::load().unwrap_or_else(|_| Config::new());
         let client = LLMClient::new_anthropic(config)?;
@@ -200,8 +198,8 @@ impl Nixcode {
 
     pub fn new_openai(
         project: Project,
-        config: LLMConfig,
-    ) -> anyhow::Result<NewNixcodeResult, LLMError> {
+        config: HttpClientOptions,
+    ) -> Result<NewNixcodeResult, LLMError> {
         let app_config = Config::load().unwrap_or_else(|_| Config::new());
         let client = LLMClient::new_openai(config)?;
         Self::new(project, client, app_config)
@@ -219,10 +217,14 @@ impl Nixcode {
     pub async fn send(self: Arc<Self>, messages: Vec<LLMMessage>) {
         let mut system_prompt = vec![Content::new_text(SYSTEM_PROMPT)];
         let project_init_analysis_content = self.project.get_project_init_analysis_content();
+        let tools = self.tools.get_enabled_tools(&self.config);
+
         if let Some(content) = project_init_analysis_content {
-            let content = format!("{}\n\n{}", "File: .nixcode/init.md", content);
+            let content = format!("<file path=\".nixcode/init.md\">{}</file>", content);
             system_prompt.push(Content::new_text(content));
         }
+
+        let default_temperature = 0.2;
 
         let system = system_prompt
             .iter()
@@ -237,27 +239,25 @@ impl Nixcode {
             Some(system)
         };
 
-        let tools = self.tools.get_enabled_tools(&self.config);
-        let tools = if tools.is_empty() { None } else { Some(tools) };
-
-        // Use LLMModelExt to access model capabilities
-        let model_ext: &dyn LLMModelExt = &self.model;
-        
-        // Default temperature based on model (0.7 is a common default)
-        let default_temperature = 0.7;
-        
         // Create request with parameters based on model capabilities
         let request = LLMRequest {
             model: self.model,
             messages,
             system,
-            max_tokens: Some(20000),
+            max_tokens: Some(8192),
             temperature: Some(default_temperature),
-            tools,
-            // Use streaming if the model supports it, otherwise fallback to non-streaming
-            stream: model_ext.supports_streaming(),
+            tools: Some(tools),
+            stream: true,
             provider_params: None,
+            // stop_sequences: Some(vec![
+            //     "[/function_call]".into(),
+            //     "</function_call>".into(),
+            //     "</|function|>".into(),
+            // ]),
+            stop_sequences: None,
         };
+
+        log::debug!("LLMRequest {:?}", request);
 
         let nixcode_event_sender = self.tx.clone();
 
@@ -500,11 +500,5 @@ impl Nixcode {
 
         drop(messages);
         self.clone().send_message(None).await
-    }
-    
-    /// Create a message optimized for the current model's capabilities
-    pub fn create_message_with_capabilities(&self, text: String) -> LLMMessage {
-        let model_ext: &dyn LLMModelExt = &self.model;
-        model_ext.create_message(text)
     }
 }

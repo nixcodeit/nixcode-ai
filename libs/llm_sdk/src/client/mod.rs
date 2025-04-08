@@ -1,4 +1,4 @@
-use crate::config::LLMConfig;
+use crate::config::HttpClientOptions;
 use crate::errors::llm::LLMError;
 use crate::message::common::llm_message::{LLMEvent, LLMRequest};
 use anthropic::AnthropicClient;
@@ -15,7 +15,7 @@ pub enum LLMClient {
 }
 
 impl LLMClient {
-    pub fn new_openai(options: LLMConfig) -> anyhow::Result<Self, LLMError> {
+    pub fn new_openai(options: HttpClientOptions) -> anyhow::Result<Self, LLMError> {
         let client = OpenAIClient::new(options);
 
         if let Err(client) = client {
@@ -25,7 +25,7 @@ impl LLMClient {
         Ok(LLMClient::OpenAI(client?))
     }
 
-    pub fn new_anthropic(options: LLMConfig) -> anyhow::Result<Self, LLMError> {
+    pub fn new_anthropic(options: HttpClientOptions) -> anyhow::Result<Self, LLMError> {
         let client = AnthropicClient::new(options);
 
         if let Err(client) = client {
@@ -60,5 +60,5 @@ pub trait LLMClientImpl {
         request: LLMRequest,
     ) -> impl std::future::Future<Output = Result<UnboundedReceiver<LLMEvent>, LLMError>> + Sync;
 
-    fn get_config(&self) -> LLMConfig;
+    fn get_config(&self) -> HttpClientOptions;
 }
