@@ -1,8 +1,6 @@
 use crate::project::Project;
 use nixcode_macros::tool;
-use octocrab::models::timelines::TimelineEvent;
-use octocrab::models::{Event, IssueState};
-use octocrab::params;
+use octocrab::models::IssueState;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

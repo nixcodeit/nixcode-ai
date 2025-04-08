@@ -4,7 +4,7 @@ use nixcode_llm_sdk::providers::LLMProvider;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::layout::{Layout, Margin, Rect};
-use ratatui::prelude::{Alignment, Color, Line, Modifier, Span, Style, Stylize, Widget};
+use ratatui::prelude::{Color, Line, Modifier, Span, Style, Stylize, Widget};
 use ratatui::widgets::Block;
 
 pub struct StatusBar {

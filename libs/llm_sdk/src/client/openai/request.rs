@@ -1,5 +1,4 @@
 use crate::message::common::llm_message::{LLMMessage, LLMRequest};
-use crate::models::llm_model::{Gpt3oMini, LLMModel};
 use serde_json::{json, Value};
 
 /// Convert our internal request format to OpenAI format

@@ -31,7 +31,7 @@ use crate::tools::git::git_stash_save::GitStashSaveTool;
 use crate::tools::git::git_status::GitStatusTool;
 use crate::tools::git::git_tag_create::GitTagCreateTool;
 use crate::tools::git::git_tags_list::GitTagsListTool;
-use crate::tools::github::issue_details::{GithubIssueDetailsParams, GithubIssueDetailsTool};
+use crate::tools::github::issue_details::GithubIssueDetailsTool;
 use crate::tools::github::list_issues::GithubIssuesListTool;
 use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
 use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
