@@ -21,9 +21,13 @@ use crate::tools::git::git_add::GitAddTool;
 use crate::tools::git::git_branch_create::GitBranchCreateTool;
 use crate::tools::git::git_branch_delete::GitBranchDeleteTool;
 use crate::tools::git::git_branches::GitBranchesTool;
+use crate::tools::git::git_checkout::GitCheckoutTool;
 use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
 use crate::tools::git::git_log::GitLogTool;
+use crate::tools::git::git_pull::GitPullTool;
+use crate::tools::git::git_push::GitPushTool;
+use crate::tools::git::git_reset::GitResetTool;
 use crate::tools::git::git_stash_apply::GitStashApplyTool;
 use crate::tools::git::git_stash_drop::GitStashDropTool;
 use crate::tools::git::git_stash_list::GitStashListTool;
@@ -130,6 +134,11 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitBranchDeleteTool {}));
                     tools.add_tool(Arc::new(GitTagCreateTool {}));
                     tools.add_tool(Arc::new(GitTagsListTool {}));
+                    // Add new git tools
+                    tools.add_tool(Arc::new(GitCheckoutTool {}));
+                    tools.add_tool(Arc::new(GitPullTool {}));
+                    tools.add_tool(Arc::new(GitPushTool {}));
+                    tools.add_tool(Arc::new(GitResetTool {}));
                 }
 
                 if !has_init_analysis {
