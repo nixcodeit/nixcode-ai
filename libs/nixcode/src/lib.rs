@@ -25,6 +25,7 @@ use crate::tools::git::git_checkout::GitCheckoutTool;
 use crate::tools::git::git_commit::GitCommitTool;
 use crate::tools::git::git_diff::GitDiffTool;
 use crate::tools::git::git_log::GitLogTool;
+use crate::tools::git::git_merge::GitMergeTool;
 use crate::tools::git::git_pull::GitPullTool;
 use crate::tools::git::git_push::GitPushTool;
 use crate::tools::git::git_reset::GitResetTool;
@@ -139,6 +140,7 @@ impl Nixcode {
                     tools.add_tool(Arc::new(GitPullTool {}));
                     tools.add_tool(Arc::new(GitPushTool {}));
                     tools.add_tool(Arc::new(GitResetTool {}));
+                    tools.add_tool(Arc::new(GitMergeTool {}));
                 }
 
                 if !has_init_analysis {

@@ -6,6 +6,7 @@ pub mod git_checkout;
 pub mod git_commit;
 pub mod git_diff;
 pub mod git_log;
+pub mod git_merge;
 pub mod git_pull;
 pub mod git_push;
 pub mod git_reset;
