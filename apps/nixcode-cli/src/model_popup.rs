@@ -114,22 +114,18 @@ impl Widget for &ModelPopup {
             let mut provider_style = Style::default()
                 .fg(get_provider_color(model.provider()))
                 .add_modifier(Modifier::BOLD);
-            if is_selected {
-                provider_style = provider_style.bg(Color::DarkGray);
-            }
 
             // Model name style with proper modifier handling
-            let mut model_style = Style::default()
-                .fg(if is_current {
-                    Color::Green
-                } else {
-                    Color::White
-                })
-                .bg(if is_selected {
-                    Color::DarkGray
-                } else {
-                    Color::Reset
-                });
+            let mut model_style = Style::default().fg(if is_current {
+                Color::Green
+            } else {
+                Color::White
+            });
+
+            if is_selected {
+                provider_style = provider_style.bg(Color::DarkGray);
+                model_style = model_style.bg(Color::DarkGray);
+            }
 
             // Only add bold if current model
             if is_current {

@@ -91,10 +91,6 @@ impl LLMClientImpl for OpenAIClient {
 
         // Convert to OpenAI format
         let openai_body = request_to_openai(&request);
-        log::debug!(
-            "OpenAI request body: {}",
-            serde_json::to_string_pretty(&openai_body).unwrap()
-        );
 
         // Send request
         let response = self
