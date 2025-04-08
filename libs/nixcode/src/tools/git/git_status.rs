@@ -60,7 +60,8 @@ pub async fn git_status(_: GitGetTreeProps, project: Arc<Project>) -> serde_json
                     _ => status_code,
                 };
                 
-                formatted_output.push_str(&format!("{} {}\n", formatted_status, file_path));
+                // Fixed: Use formatted_status directly without any trimming
+                formatted_output.push_str(&format!("{}{}\n", formatted_status, file_path));
             } else {
                 // Just in case there's an unexpected format
                 formatted_output.push_str(&format!("{}\n", entry));
