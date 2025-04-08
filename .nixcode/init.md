@@ -153,6 +153,67 @@ Configuration can be applied at two levels:
 
 An example configuration file is available at `.nixcode/config.example.toml`.
 
+## Documentation Structure
+
+The project includes comprehensive documentation organized by component:
+
+### nixcode-cli Documentation (apps/nixcode-cli/docs/)
+- **README.md**: Overview and table of contents
+- **api-reference.md**: API reference for the CLI application
+- **architecture.md**: Architectural overview of the CLI
+- **components.md**: Detailed component descriptions
+- **developer-guide.md**: Guide for developers working on the CLI
+- **index.md**: Main documentation entry point
+- **user-guide.md**: Guide for end users
+
+### LLM SDK Documentation (libs/llm_sdk/docs/)
+- **README.md**: Overview and table of contents
+- **client.md**: Client API documentation
+- **config.md**: Configuration system documentation
+- **cost.md**: Cost calculation documentation
+- **custom_providers.md**: Guide for implementing custom providers
+- **errors.md**: Error handling documentation
+- **message.md**: Message structure documentation
+- **models.md**: Model definitions documentation
+- **streaming.md**: Streaming response handling
+- **tokens.md**: Token counting documentation
+- **tools.md**: Tool definition documentation
+- **tools_usage.md**: Guide for using tools with LLMs
+
+### Nixcode Core Documentation (libs/nixcode/docs/)
+- **README.md**: Overview and table of contents
+- **architecture.md**: Architectural overview
+- **api/**: API reference
+  - **README.md**: API documentation overview
+  - **public.md**: Public API documentation
+  - **tool.md**: Tool trait documentation
+- **core/**: Core components documentation
+  - **README.md**: Core components overview
+  - **config.md**: Configuration system documentation
+  - **events.md**: Event system documentation
+  - **nixcode.md**: Nixcode component documentation
+  - **project.md**: Project management documentation
+  - **prompts.md**: System prompts documentation
+- **tools/**: Tool implementation documentation
+  - **README.md**: Tools overview
+  - **commands.md**: Command tools documentation
+  - **fs.md**: File system tools documentation
+  - **git.md**: Git tools documentation
+  - **github.md**: GitHub tools documentation
+  - **glob.md**: Glob tools documentation
+  - **prompt.md**: Prompt tools documentation
+  - **search.md**: Search tools documentation
+- **utils/**: Utilities documentation
+  - **README.md**: Utilities overview
+  - **fs.md**: File system utilities documentation
+
+### Nixcode Macros Documentation (libs/nixcode-macros/docs/)
+- **README.md**: Overview and usage guide
+- **index.md**: Main documentation entry point
+- **technical.md**: Technical implementation details
+- **testing.md**: Testing guide
+- **usage-guide.md**: Detailed usage guide
+
 ## Workflow
 
 1. **User Input Flow**:
