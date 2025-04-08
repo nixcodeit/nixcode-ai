@@ -337,6 +337,7 @@ impl Chat {
         self.scroll = 0;
         self.total_lines = 0;
         self.usage = AnthropicUsage::default();
+        self.total_cost = 0.0;
     }
 
     /// Retry last message that was sent by the user
