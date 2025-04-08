@@ -23,6 +23,7 @@ pub struct Chat {
     paragraph: Paragraph<'static>,
     client: Arc<Nixcode>,
     input_mode: InputMode,
+    #[allow(dead_code)]
     app_event: UnboundedSender<AppEvent>,
     prompt: UserSingleLineInput,
     area_size: (u16, u16), // (width, height)

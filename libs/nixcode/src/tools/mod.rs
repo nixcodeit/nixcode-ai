@@ -37,6 +37,8 @@ impl Tools {
         }
     }
 
+    // These methods are kept for potential future use
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.hashmap.len() == 0
     }
@@ -49,6 +51,8 @@ impl Tools {
         self.hashmap.get(name).cloned()
     }
 
+    // This method is kept for potential future use
+    #[allow(dead_code)]
     pub fn get_all_tools(&self) -> Vec<nixcode_llm_sdk::tools::Tool> {
         self.hashmap
             .values()

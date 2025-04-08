@@ -77,7 +77,7 @@ impl UserSingleLineInput {
     pub fn handle_delete(&mut self) {
         if self.cursor < self.data.chars().count() {
             // Get the size of the character at cursor
-            let char_size = self.data[self.cursor_byte..]
+            let _char_size = self.data[self.cursor_byte..]
                 .chars()
                 .next()
                 .map(|c| c.len_utf8())

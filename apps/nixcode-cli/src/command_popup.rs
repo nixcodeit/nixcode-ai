@@ -416,8 +416,8 @@ impl CommandPopup {
         if is_selected {
             for x in area.x..area.x + area.width {
                 for y in area.y..area.y + area.height {
-                    buf.get_mut(x, y)
-                        .set_style(Style::default().bg(Color::DarkGray));
+                    // Use the new recommended approach instead of get_mut
+                    buf[(x, y)].set_style(Style::default().bg(Color::DarkGray));
                 }
             }
         }

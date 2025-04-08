@@ -99,7 +99,6 @@ impl App {
                     .handle_input_events(self.input_mode, &event)
                     .await
             }
-            _ => todo!(),
         }
 
         match self.input_mode {
@@ -355,10 +354,13 @@ impl App {
         self.should_quit = true;
     }
 
+    // These methods are kept for potential future use
+    #[allow(dead_code)]
     fn show_chat_view(&mut self) {
         self.current_view = AppView::Chat;
     }
 
+    #[allow(dead_code)]
     fn show_help(&mut self) {
         // A placeholder for future help implementation
         // For now, we'll just return to normal mode

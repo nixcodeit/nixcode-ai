@@ -6,7 +6,6 @@ use crate::message::usage::AnthropicUsage;
 use crate::models::llm_model::LLMModel;
 use crate::stop_reason::StopReason;
 use crate::tools::Tool;
-use futures::TryFutureExt;
 use serde_json::Value;
 
 /// Common message structure for all LLM providers

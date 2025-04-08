@@ -13,6 +13,8 @@ pub struct GitStashListParams {
     // Empty parameters as this command doesn't require any
 }
 
+// This struct is not currently used but kept for potential future implementation
+#[allow(dead_code)]
 #[derive(Serialize)]
 struct StashEntry {
     index: usize,

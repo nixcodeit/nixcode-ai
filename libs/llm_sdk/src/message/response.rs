@@ -20,7 +20,9 @@ pub struct MessageResponse {
     pub usage: AnthropicUsage,
 }
 
+// This method is kept for potential future use
 impl MessageResponse {
+    #[allow(dead_code)]
     pub(crate) fn finish_content_block(&mut self, index: usize) {
         let x = self.content.get_mut(index);
         if let Some(content) = x {

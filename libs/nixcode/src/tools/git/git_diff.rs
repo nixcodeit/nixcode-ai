@@ -48,8 +48,6 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
         Err(_) => None, // No HEAD yet
     };
 
-    let mut diff_result = String::new();
-
     // If we have a HEAD, compare with it
     if let Some(head_tree) = head_tree {
         let diff =
@@ -82,10 +80,8 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
             return json!(format!("Error printing diff: {}", e));
         }
 
-        diff_result = diff_output;
-
         // If empty, the file might be staged
-        if diff_result.is_empty() {
+        if diff_output.is_empty() {
             let diff = match repo.diff_index_to_workdir(None, Some(&mut diff_options)) {
                 Ok(diff) => diff,
                 Err(e) => return json!(format!("Error creating diff: {}", e)),
@@ -114,13 +110,17 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
                 return json!(format!("Error printing diff: {}", e));
             }
 
-            diff_result = staged_output;
+            if !staged_output.is_empty() {
+                return json!(staged_output);
+            }
+        } else {
+            return json!(diff_output);
         }
     } else {
         // No HEAD yet, show the entire file as new
         match std::fs::read_to_string(&full_path) {
             Ok(content) => {
-                diff_result = format!("New file: {}\n\n{}", props.file_path, content);
+                return json!(format!("New file: {}\n\n{}", props.file_path, content));
             }
             Err(e) => {
                 return json!(format!("Error reading file: {}", e));
@@ -128,9 +128,5 @@ pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json:
         }
     }
 
-    if diff_result.is_empty() {
-        return json!(format!("No changes detected for file: {}", props.file_path));
-    }
-
-    json!(diff_result)
+    json!(format!("No changes detected for file: {}", props.file_path))
 }

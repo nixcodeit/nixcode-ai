@@ -8,7 +8,6 @@ pub mod providers;
 pub mod stop_reason;
 pub mod tools;
 
-use futures::StreamExt;
 use message::content::Content;
 pub use message::MessageDelta;
 use serde::{Deserialize, Serialize};

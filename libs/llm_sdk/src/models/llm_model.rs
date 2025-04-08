@@ -4,7 +4,7 @@ use crate::models::anthropic::sonnet37::sonnet37_cost_calculation;
 use crate::models::capabilities::{ModelCapabilities, ModelCapabilitiesBuilder};
 use crate::providers::LLMProvider;
 use lazy_static::lazy_static;
-use std::fmt::{Debug, Display, Formatter, Write};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
 lazy_static! {
