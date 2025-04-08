@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub mod commands;
 pub mod fs;
 pub mod git;
+pub mod github;
 pub mod glob;
 pub mod prompt;
 pub mod search;

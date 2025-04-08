@@ -26,3 +26,4 @@ walkdir = "2.5.0"
 git2 = "0.20.1"
 chrono = "0.4"
 log = { version = "0.4.27" }
+octocrab = { version = "0.44.0", features = ["retry", "follow-redirect", "tokio"] }

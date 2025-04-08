@@ -1,11 +1,22 @@
+use crate::config::GitHubSettings;
 use git2::Repository;
 use std::path::PathBuf;
+
+#[derive(Clone, Debug)]
+pub struct GitHub {
+    /// GitHub account/organization name
+    pub org: Option<String>,
+
+    /// GitHub repository name
+    pub repo: Option<String>,
+}
 
 #[derive(Clone, Debug)]
 pub struct Project {
     cwd: PathBuf,
     project_init_analysis_content: Option<String>,
     repo_path: Option<PathBuf>,
+    github: Option<GitHub>,
 }
 
 impl Project {
@@ -29,6 +40,7 @@ impl Project {
             cwd,
             project_init_analysis_content,
             repo_path: repository,
+            github: None,
         }
     }
 
@@ -50,5 +62,18 @@ impl Project {
 
     pub fn get_repo_path(&self) -> Option<PathBuf> {
         self.repo_path.clone()
+    }
+
+    pub fn set_github(&mut self, github: &GitHubSettings) -> &mut Self {
+        self.github = Some(GitHub {
+            org: github.org.clone(),
+            repo: github.repo.clone(),
+        });
+
+        self
+    }
+
+    pub fn get_github(&self) -> Option<GitHub> {
+        self.github.clone()
     }
 }

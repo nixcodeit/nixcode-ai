@@ -31,6 +31,8 @@ use crate::tools::git::git_stash_save::GitStashSaveTool;
 use crate::tools::git::git_status::GitStatusTool;
 use crate::tools::git::git_tag_create::GitTagCreateTool;
 use crate::tools::git::git_tags_list::GitTagsListTool;
+use crate::tools::github::issue_details::{GithubIssueDetailsParams, GithubIssueDetailsTool};
+use crate::tools::github::list_issues::GithubIssuesListTool;
 use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
 use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
 use crate::tools::search::replace_content::ReplaceContentTool;
@@ -109,6 +111,10 @@ impl Nixcode {
                 tools.add_tool(Arc::new(CargoFixTool {}));
                 tools.add_tool(Arc::new(CargoTestTool {}));
 
+                // GitHub tools
+                tools.add_tool(Arc::new(GithubIssuesListTool {}));
+                tools.add_tool(Arc::new(GithubIssueDetailsTool {}));
+
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));
                     tools.add_tool(Arc::new(GitCommitTool {}));
@@ -138,14 +144,36 @@ impl Nixcode {
     }
 
     /// Creates a new Nixcode instance with configuration from files or environment
-    pub fn new_from_env(project: Project) -> anyhow::Result<NewNixcodeResult, LLMError> {
+    pub fn new_from_env(project: Project) -> Result<NewNixcodeResult, LLMError> {
         // Try to load configuration, fallback to defaults if it fails
         let config = Config::load().unwrap_or_else(|_| Config::new());
         Self::new_with_config(project, config)
     }
 
     /// Creates a new Nixcode instance with provided configuration
-    pub fn new_with_config(project: Project, config: Config) -> Result<NewNixcodeResult, LLMError> {
+    pub fn new_with_config(
+        mut project: Project,
+        config: Config,
+    ) -> Result<NewNixcodeResult, LLMError> {
+        if let Ok(token) = config.get_github_token() {
+            let client = octocrab::OctocrabBuilder::new()
+                .user_access_token(token.clone())
+                .build();
+
+            if let Err(e) = client {
+                log::error!("Failed to initialize Octocrab client: {}", e);
+
+                return Err(LLMError::Generic(format!(
+                    "Failed to initialize Octocrab client: {}",
+                    e
+                )));
+            }
+
+            octocrab::initialise(client.unwrap());
+        }
+
+        project.set_github(&config.github);
+
         let provider = &config.llm.default_provider;
 
         // Try to get API key for the provider
@@ -184,25 +212,6 @@ impl Nixcode {
                 Self::new(project, client, config)
             }
         }
-    }
-
-    // Legacy methods kept for compatibility
-    pub fn new_anthropic(
-        project: Project,
-        config: HttpClientOptions,
-    ) -> anyhow::Result<NewNixcodeResult, LLMError> {
-        let app_config = Config::load().unwrap_or_else(|_| Config::new());
-        let client = LLMClient::new_anthropic(config)?;
-        Self::new(project, client, app_config)
-    }
-
-    pub fn new_openai(
-        project: Project,
-        config: HttpClientOptions,
-    ) -> Result<NewNixcodeResult, LLMError> {
-        let app_config = Config::load().unwrap_or_else(|_| Config::new());
-        let client = LLMClient::new_openai(config)?;
-        Self::new(project, client, app_config)
     }
 
     pub fn with_model(mut self, model: &'static LLMModel) -> Self {

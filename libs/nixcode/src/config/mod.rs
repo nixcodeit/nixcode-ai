@@ -10,6 +10,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use toml;
 
+/// GitHub-specific settings
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct GitHubSettings {
+    /// GitHub API token (can use ${ENV_VAR} syntax)
+    pub token: Option<String>,
+
+    /// GitHub profile/organization name
+    pub org: Option<String>,
+
+    /// GitHub repository name
+    pub repo: Option<String>,
+}
+
 /// The Config struct represents the application configuration
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -24,6 +37,10 @@ pub struct Config {
     /// Tool configuration
     #[serde(default)]
     pub tools: ToolsConfig,
+
+    /// GitHub configuration
+    #[serde(default)]
+    pub github: GitHubSettings,
 }
 
 /// LLM general settings
@@ -91,6 +108,7 @@ impl Config {
             llm: LLMSettings::default(),
             providers: Providers::default(),
             tools: ToolsConfig::default(),
+            github: GitHubSettings::default(),
         }
     }
 
@@ -122,6 +140,19 @@ impl Config {
             "groq" => LLMProvider::Groq.default_model(),
             "open_router" => LLMProvider::OpenRouter.default_model(),
             _ => LLMProvider::Anthropic.default_model(),
+        }
+    }
+
+    pub fn get_github_token(&self) -> Result<String> {
+        if let Some(token) = &self.github.token {
+            let expanded_token = expand_env_vars(token);
+            if expanded_token.is_empty() {
+                return Err(anyhow::anyhow!("GitHub token is empty"));
+            }
+
+            Ok(expanded_token)
+        } else {
+            Err(anyhow::anyhow!("GitHub token not set"))
         }
     }
 
