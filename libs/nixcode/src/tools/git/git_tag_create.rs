@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use git2::Oid;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use tokio::process::Command;
 
-use super::utils::resolve_repository;
+use super::utils::run_git_command;
 use crate::project::Project;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -29,99 +28,50 @@ pub async fn git_tag_create(
     params: GitTagCreateParams,
     project: Arc<Project>,
 ) -> serde_json::Value {
-    let repository = resolve_repository(project.get_repo_path());
-    if repository.is_none() {
-        return json!("Not a git repository");
-    }
-
-    let repository = repository.unwrap();
+    let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
     let tag_name = params.tag_name;
     let message = params.message;
-    let target_str = params.target;
+    let target = params.target;
     let force = params.force.unwrap_or(false);
-
-    // Get the target commit
-    let target_oid = match target_str {
-        Some(target) => {
-            // Parse the provided commit hash
-            match Oid::from_str(&target) {
-                Ok(oid) => oid,
-                Err(e) => return json!(format!("Invalid commit hash '{}': {}", target, e)),
-            }
-        }
-        None => {
-            // Use HEAD
-            match repository.head() {
-                Ok(head) => match head.target() {
-                    Some(oid) => oid,
-                    None => return json!("HEAD reference is invalid"),
-                },
-                Err(e) => return json!(format!("Failed to get HEAD: {}", e)),
-            }
-        }
-    };
-
-    // Find the target commit
-    let target_commit = match repository.find_commit(target_oid) {
-        Ok(commit) => commit,
-        Err(e) => return json!(format!("Failed to find commit: {}", e)),
-    };
-
-    let tag_oid = Oid::from_str(tag_name.as_str());
-
-    if let Err(e) = tag_oid {
-        return json!(format!("Invalid tag name '{}': {}", tag_name, e));
+    
+    let mut cmd = Command::new("git");
+    cmd.current_dir(current_dir)
+       .arg("tag");
+    
+    // Add force flag if requested
+    if force {
+        cmd.arg("-f");
     }
-
-    let tag_oid = tag_oid.unwrap();
-
-    // Check if the tag already exists
-    if repository.find_tag(tag_oid).is_ok() && !force {
-        return json!(format!(
-            "Tag '{}' already exists. Use force option to override.",
-            tag_name
-        ));
+    
+    // Add message if provided (creates annotated tag)
+    if let Some(msg) = &message {
+        cmd.arg("-a")
+           .arg("-m")
+           .arg(msg);
     }
-
-    let tagger = match repository.signature() {
-        Ok(sig) => sig,
-        Err(e) => return json!(format!("Failed to get signature: {}", e)),
-    };
-
-    // Create the tag
-    let result = match message {
-        // Create an annotated tag with message
-        Some(msg) => {
-            let tag_oid = repository.tag(
-                &tag_name,
-                &target_commit.into_object(),
-                &tagger,
-                &msg,
-                force,
-            );
-            match tag_oid {
-                Ok(_) => json!(format!("Annotated tag '{}' created successfully", tag_name)),
-                Err(e) => json!(format!(
-                    "Failed to create annotated tag '{}': {}",
-                    tag_name, e
-                )),
-            }
+    
+    // Add the tag name
+    cmd.arg(&tag_name);
+    
+    // Add target commit if provided
+    if let Some(target_commit) = &target {
+        cmd.arg(target_commit);
+    }
+    
+    let output = run_git_command(cmd).await;
+    
+    // Check if the command was successful
+    if let Some(result) = output.as_str() {
+        if result.contains("error") || result.contains("fatal") {
+            return output;
         }
-        // Create a lightweight tag
-        None => {
-            let result = repository.tag_lightweight(&tag_name, &target_commit.into_object(), force);
-            match result {
-                Ok(_) => json!(format!(
-                    "Lightweight tag '{}' created successfully",
-                    tag_name
-                )),
-                Err(e) => json!(format!(
-                    "Failed to create lightweight tag '{}': {}",
-                    tag_name, e
-                )),
-            }
+        
+        if message.is_some() {
+            return serde_json::json!(format!("Annotated tag '{}' created successfully", tag_name));
+        } else {
+            return serde_json::json!(format!("Lightweight tag '{}' created successfully", tag_name));
         }
-    };
-
-    result
+    }
+    
+    output
 }

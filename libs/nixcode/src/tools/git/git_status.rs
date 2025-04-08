@@ -1,13 +1,11 @@
-use core::str;
 use std::sync::Arc;
 
-use git2::{Status, SubmoduleIgnore};
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use tokio::process::Command;
 
-use super::utils::resolve_repository;
+use super::utils::run_git_command;
 use crate::project::Project;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -15,115 +13,63 @@ pub struct GitGetTreeProps {}
 
 #[tool("Get git status")]
 pub async fn git_status(_: GitGetTreeProps, project: Arc<Project>) -> serde_json::Value {
-    let repository = resolve_repository(project.get_repo_path());
-    if repository.is_none() {
-        return json!("Not a git repository");
+    let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
+    
+    let mut cmd = Command::new("git");
+    cmd.current_dir(current_dir)
+       .arg("status")
+       .arg("--porcelain")
+       .arg("-z");
+    
+    let output = run_git_command(cmd).await;
+    
+    // If the output is empty or just whitespace, the working tree is clean
+    if let Some(result) = output.as_str() {
+        if result.trim().is_empty() {
+            return serde_json::json!("Working tree clean");
+        }
+        
+        // Process the porcelain output to match the previous format
+        let mut formatted_output = String::new();
+        
+        // Split by null character (0 byte) which is used by git status -z
+        for entry in result.split('\0') {
+            if entry.is_empty() {
+                continue;
+            }
+            
+            // First two characters are the status codes
+            if entry.len() >= 2 {
+                let status_code = &entry[0..2];
+                let file_path = &entry[3..];
+                
+                // Convert the status code to the format used by the previous implementation
+                let formatted_status = match status_code.trim() {
+                    "A " => "A  ",
+                    " A" => " A ",
+                    "M " => "M  ",
+                    " M" => " M ",
+                    "D " => "D  ",
+                    " D" => " D ",
+                    "R " => "R  ",
+                    " R" => " R ",
+                    "C " => "C  ",
+                    " C" => " C ",
+                    "??" => "?? ",
+                    "!!" => "!! ",
+                    _ => status_code,
+                };
+                
+                formatted_output.push_str(&format!("{} {}\n", formatted_status, file_path));
+            } else {
+                // Just in case there's an unexpected format
+                formatted_output.push_str(&format!("{}\n", entry));
+            }
+        }
+        
+        return serde_json::json!(formatted_output);
     }
-
-    let repository = repository.unwrap();
-
-    let statuses = repository.statuses(None);
-    if let Err(e) = statuses {
-        return json!(format!("Cannot get statuses, reason: {}", e));
-    }
-    let statuses = statuses.unwrap();
-
-    if statuses.is_empty() {
-        return json!("Working tree clean");
-    }
-
-    let mut result = String::new();
-
-    statuses
-        .into_iter()
-        .filter(|e| e.status() != Status::CURRENT)
-        .for_each(|entry| {
-            let status = entry.status();
-            let mut istatus = match status {
-                Status::INDEX_NEW => 'A',
-                Status::INDEX_MODIFIED => 'M',
-                Status::INDEX_DELETED => 'D',
-                Status::INDEX_RENAMED => 'R',
-                Status::INDEX_TYPECHANGE => 'T',
-                _ => ' ',
-            };
-
-            let wstatus = match status {
-                s if s.contains(git2::Status::WT_NEW) => {
-                    if istatus == ' ' {
-                        istatus = '?';
-                    }
-                    '?'
-                }
-                s if s.contains(git2::Status::WT_MODIFIED) => 'M',
-                s if s.contains(git2::Status::WT_DELETED) => 'D',
-                s if s.contains(git2::Status::WT_RENAMED) => 'R',
-                s if s.contains(git2::Status::WT_TYPECHANGE) => 'T',
-                _ => ' ',
-            };
-
-            if status.contains(Status::IGNORED) {
-                return;
-            }
-
-            let mut extra = "";
-            let status = entry.index_to_workdir().and_then(|diff| {
-                let ignore = SubmoduleIgnore::Unspecified;
-                diff.new_file()
-                    .path_bytes()
-                    .and_then(|s| str::from_utf8(s).ok())
-                    .and_then(|name| repository.submodule_status(name, ignore).ok())
-            });
-            if let Some(status) = status {
-                if status.contains(git2::SubmoduleStatus::WD_MODIFIED) {
-                    extra = " (new commits)";
-                } else if status.contains(git2::SubmoduleStatus::WD_INDEX_MODIFIED)
-                    || status.contains(git2::SubmoduleStatus::WD_WD_MODIFIED)
-                {
-                    extra = " (modified content)";
-                } else if status.contains(git2::SubmoduleStatus::WD_UNTRACKED) {
-                    extra = " (untracked content)";
-                }
-            }
-
-            let (mut a, mut b, mut c) = (None, None, None);
-            if let Some(diff) = entry.head_to_index() {
-                a = diff.old_file().path();
-                b = diff.new_file().path();
-            }
-            if let Some(diff) = entry.index_to_workdir() {
-                a = a.or_else(|| diff.old_file().path());
-                b = b.or_else(|| diff.old_file().path());
-                c = diff.new_file().path();
-            }
-
-            let file_status = match (istatus, wstatus) {
-                ('R', 'R') => format!(
-                    "RR {} {} {}{}",
-                    a.unwrap().display(),
-                    b.unwrap().display(),
-                    c.unwrap().display(),
-                    extra
-                ),
-                ('R', w) => format!(
-                    "R{} {} {}{}",
-                    w,
-                    a.unwrap().display(),
-                    b.unwrap().display(),
-                    extra
-                ),
-                (i, 'R') => format!(
-                    "{}R {} {}{}",
-                    i,
-                    a.unwrap().display(),
-                    c.unwrap().display(),
-                    extra
-                ),
-                (i, w) => format!("{}{} {}{}", i, w, a.unwrap().display(), extra),
-            };
-
-            result.push_str(format!("{}\n", file_status).as_str());
-        });
-
-    json!(result)
+    
+    // If we get here, there was likely an error
+    output
 }

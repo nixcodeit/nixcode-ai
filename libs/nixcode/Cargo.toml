@@ -23,7 +23,6 @@ async-trait = "0.1.88"
 toml = "0.8.12"
 directories = "5.0.1"
 walkdir = "2.5.0"
-git2 = "0.20.1"
 chrono = "0.4"
 log = { version = "0.4.27" }
 octocrab = { version = "0.44.0", features = ["retry", "follow-redirect", "tokio"] }

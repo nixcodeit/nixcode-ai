@@ -1,14 +1,12 @@
-use core::str;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 
-use git2::DiffOptions;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use tokio::process::Command;
 
-use super::utils::resolve_repository;
+use super::utils::run_git_command;
 use crate::project::Project;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -19,114 +17,73 @@ pub struct GitDiffProps {
 
 #[tool("Get file diff")]
 pub async fn git_diff(props: GitDiffProps, project: Arc<Project>) -> serde_json::Value {
-    let repository = resolve_repository(project.get_repo_path());
-    if repository.is_none() {
-        return json!("Not a git repository");
-    }
-
-    let repo = repository.unwrap();
-    let file_path = PathBuf::from(&props.file_path);
-
+    let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
+    
     // Check if file exists
-    let full_path = project.get_repo_path().unwrap().join(&file_path);
-    if !full_path.exists() {
-        return json!(format!("File not found: {}", props.file_path));
+    let full_path = current_dir.join(&props.file_path);
+    if !Path::new(&full_path).exists() {
+        return serde_json::json!(format!("File not found: {}", props.file_path));
     }
-
-    // Get the diff
-    let mut diff_options = DiffOptions::new();
-    diff_options.pathspec(&props.file_path);
-    diff_options.context_lines(3);
-    diff_options.show_binary(true);
-
-    // Get HEAD tree
-    let head_tree = match repo.head() {
-        Ok(head) => match head.peel_to_tree() {
-            Ok(tree) => Some(tree),
-            Err(_) => None, // New repository with no commits
-        },
-        Err(_) => None, // No HEAD yet
-    };
-
-    // If we have a HEAD, compare with it
-    if let Some(head_tree) = head_tree {
-        let diff =
-            match repo.diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_options)) {
-                Ok(diff) => diff,
-                Err(e) => return json!(format!("Error creating diff: {}", e)),
-            };
-
-        // Format diff output
-        let mut diff_output = String::new();
-        if let Err(e) = diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-            let origin = line.origin();
-            let content = match str::from_utf8(line.content()) {
-                Ok(content) => content,
-                Err(_) => return false,
-            };
-
-            // Format the output
-            let prefix = match origin {
-                '+' => "+", // Added
-                '-' => "-", // Removed
-                'H' => "",  // Hunk header
-                'B' => "",  // Binary content
-                _ => "",    // Context and other lines
-            };
-
-            diff_output.push_str(&format!("{}{}", prefix, content));
-            true
-        }) {
-            return json!(format!("Error printing diff: {}", e));
+    
+    // First try to get diff for the file (including staged changes)
+    let mut cmd = Command::new("git");
+    cmd.current_dir(&current_dir)
+       .arg("diff")
+       .arg("HEAD")
+       .arg("--")
+       .arg(&props.file_path);
+    
+    let output = run_git_command(cmd).await;
+    
+    // If there's no output, the file might be new or only staged
+    if let Some(result) = output.as_str() {
+        if result.trim().is_empty() {
+            // Check if the file is staged
+            let mut staged_cmd = Command::new("git");
+            staged_cmd.current_dir(&current_dir)
+                     .arg("diff")
+                     .arg("--cached")
+                     .arg("--")
+                     .arg(&props.file_path);
+            
+            let staged_output = run_git_command(staged_cmd).await;
+            
+            if let Some(staged_result) = staged_output.as_str() {
+                if !staged_result.trim().is_empty() {
+                    return staged_output;
+                }
+            }
+            
+            // If the file is new and not tracked, show it as a new file
+            let mut status_cmd = Command::new("git");
+            status_cmd.current_dir(&current_dir)
+                     .arg("status")
+                     .arg("--porcelain")
+                     .arg("--")
+                     .arg(&props.file_path);
+            
+            let status_output = run_git_command(status_cmd).await;
+            
+            if let Some(status_result) = status_output.as_str() {
+                if status_result.trim().starts_with("??") {
+                    // It's a new untracked file, read its contents
+                    let mut cat_cmd = Command::new("cat");
+                    cat_cmd.current_dir(&current_dir)
+                           .arg(&props.file_path);
+                    
+                    let cat_output = run_git_command(cat_cmd).await;
+                    
+                    if let Some(content) = cat_output.as_str() {
+                        return serde_json::json!(format!("New file: {}\n\n{}", props.file_path, content));
+                    }
+                }
+            }
+            
+            return serde_json::json!(format!("No changes detected for file: {}", props.file_path));
         }
-
-        // If empty, the file might be staged
-        if diff_output.is_empty() {
-            let diff = match repo.diff_index_to_workdir(None, Some(&mut diff_options)) {
-                Ok(diff) => diff,
-                Err(e) => return json!(format!("Error creating diff: {}", e)),
-            };
-
-            let mut staged_output = String::new();
-            if let Err(e) = diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-                let origin = line.origin();
-                let content = match str::from_utf8(line.content()) {
-                    Ok(content) => content,
-                    Err(_) => return false,
-                };
-
-                // Format the output
-                let prefix = match origin {
-                    '+' => "+", // Added
-                    '-' => "-", // Removed
-                    'H' => "",  // Hunk header
-                    'B' => "",  // Binary content
-                    _ => "",    // Context and other lines
-                };
-
-                staged_output.push_str(&format!("{}{}", prefix, content));
-                true
-            }) {
-                return json!(format!("Error printing diff: {}", e));
-            }
-
-            if !staged_output.is_empty() {
-                return json!(staged_output);
-            }
-        } else {
-            return json!(diff_output);
-        }
-    } else {
-        // No HEAD yet, show the entire file as new
-        match std::fs::read_to_string(&full_path) {
-            Ok(content) => {
-                return json!(format!("New file: {}\n\n{}", props.file_path, content));
-            }
-            Err(e) => {
-                return json!(format!("Error reading file: {}", e));
-            }
-        }
+        
+        return output;
     }
-
-    json!(format!("No changes detected for file: {}", props.file_path))
+    
+    output
 }

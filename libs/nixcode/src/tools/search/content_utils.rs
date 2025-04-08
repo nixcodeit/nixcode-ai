@@ -3,6 +3,7 @@ use glob::glob;
 use regex::Regex;
 use serde_json::json;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 
 /// Validates regex pattern and returns a compiled regex or error message
@@ -66,7 +67,13 @@ pub async fn filter_paths(
     let cwd = project.get_cwd().clone();
 
     tokio::task::spawn_blocking(move || {
-        let repository = git2::Repository::discover(project.get_cwd().as_path()).ok();
+        // Check if we're in a git repository
+        let is_git_repo = Command::new("git")
+            .current_dir(&project.get_cwd())
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
 
         paths
             .iter()
@@ -90,9 +97,17 @@ pub async fn filter_paths(
                 }
 
                 // Check gitignore
-                if let Some(repo) = &repository {
-                    if repo.is_path_ignored(rel_path).unwrap_or(false) {
-                        return None;
+                if is_git_repo && !include_git {
+                    let output = Command::new("git")
+                        .current_dir(&cwd)
+                        .args(["check-ignore", "-q", rel_path])
+                        .output();
+                    
+                    if let Ok(output) = output {
+                        // If the command succeeds (exit code 0), the file is ignored
+                        if output.status.success() {
+                            return None;
+                        }
                     }
                 }
 

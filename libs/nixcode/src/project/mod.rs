@@ -1,6 +1,6 @@
 use crate::config::GitHubSettings;
-use git2::Repository;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Clone, Debug)]
 pub struct GitHub {
@@ -30,10 +30,27 @@ impl Project {
             }
         }
 
-        let repository = if let Some(repository) = Repository::discover(cwd.as_path()).ok() {
-            repository.workdir().map(|path| path.into())
-        } else {
-            None
+        // Try to find git repository root using git rev-parse
+        let repository = {
+            let output = Command::new("git")
+                .current_dir(&cwd)
+                .args(["rev-parse", "--show-toplevel"])
+                .output()
+                .ok();
+            
+            if let Some(output) = output {
+                if output.status.success() {
+                    if let Ok(path) = String::from_utf8(output.stdout) {
+                        Some(PathBuf::from(path.trim()))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         };
 
         Self {

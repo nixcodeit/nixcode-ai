@@ -3,9 +3,9 @@ use std::sync::Arc;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use tokio::process::Command;
 
-use super::utils::resolve_repository;
+use super::utils::run_git_command;
 use crate::project::Project;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -22,57 +22,39 @@ pub async fn git_branch_create(
     params: GitBranchCreateParams,
     project: Arc<Project>,
 ) -> serde_json::Value {
-    let repository = resolve_repository(project.get_repo_path());
-    if repository.is_none() {
-        return json!("Not a git repository");
-    }
-
-    let repository = repository.unwrap();
+    let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
     let branch_name = params.branch_name;
     let switch = params.switch.unwrap_or(false);
-
-    // Get HEAD commit to branch from
-    let head = match repository.head() {
-        Ok(head) => head,
-        Err(e) => return json!(format!("Failed to get HEAD reference: {}", e)),
-    };
-
-    let commit = match head.peel_to_commit() {
-        Ok(commit) => commit,
-        Err(e) => return json!(format!("Failed to get HEAD commit: {}", e)),
-    };
-
-    // Create the branch
-    let branch_result = repository.branch(&branch_name, &commit, false);
-
-    match branch_result {
-        Ok(branch) => {
-            // Checkout the branch if requested
-            if switch {
-                let obj = branch.get().peel(git2::ObjectType::Any).unwrap();
-                match repository.checkout_tree(&obj, None) {
-                    Ok(_) => {
-                        // Update HEAD to point to our branch now
-                        match repository.set_head(&format!("refs/heads/{}", branch_name)) {
-                            Ok(_) => json!(format!(
-                                "Branch '{}' created and checked out successfully",
-                                branch_name
-                            )),
-                            Err(e) => json!(format!(
-                                "Branch '{}' created, but failed to update HEAD: {}",
-                                branch_name, e
-                            )),
-                        }
-                    }
-                    Err(e) => json!(format!(
-                        "Branch '{}' created, but failed to check it out: {}",
-                        branch_name, e
-                    )),
-                }
-            } else {
-                json!(format!("Branch '{}' created successfully", branch_name))
-            }
-        }
-        Err(e) => json!(format!("Failed to create branch '{}': {}", branch_name, e)),
+    
+    let mut cmd = Command::new("git");
+    
+    if switch {
+        // Use checkout -b to create and switch to the branch
+        cmd.current_dir(current_dir)
+           .arg("checkout")
+           .arg("-b")
+           .arg(&branch_name);
+    } else {
+        // Just create the branch without switching
+        cmd.current_dir(current_dir)
+           .arg("branch")
+           .arg(&branch_name);
     }
+    
+    let output = run_git_command(cmd).await;
+    
+    // Check if the command was successful
+    if let Some(result) = output.as_str() {
+        if result.contains("error") || result.contains("fatal") {
+            return output;
+        }
+        
+        if switch {
+            return serde_json::json!(format!("Branch '{}' created and checked out successfully", branch_name));
+        } else {
+            return serde_json::json!(format!("Branch '{}' created successfully", branch_name));
+        }
+    }
+    
+    output
 }

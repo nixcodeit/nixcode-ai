@@ -12,4 +12,4 @@ pub mod git_stash_save;
 pub mod git_status;
 pub mod git_tag_create;
 pub mod git_tags_list;
-mod utils;
+pub mod utils;

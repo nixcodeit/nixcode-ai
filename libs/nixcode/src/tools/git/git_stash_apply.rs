@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use git2::StashApplyOptions;
 use nixcode_macros::tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use tokio::process::Command;
 
-use super::utils::resolve_repository;
+use super::utils::run_git_command;
 use crate::project::Project;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -23,40 +22,42 @@ pub async fn git_stash_apply(
     props: GitStashApplyParams,
     project: Arc<Project>,
 ) -> serde_json::Value {
-    let repository = resolve_repository(project.get_repo_path());
-    if repository.is_none() {
-        return json!("Not a git repository");
-    }
-
-    let mut repository = repository.unwrap();
-
+    let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
+    
     // Default stash index is 0 (most recent stash)
     let stash_index = props.stash_index.unwrap_or(0);
     let pop = props.pop.unwrap_or(false);
-
-    // Apply the stash
-    let mut apply_options = StashApplyOptions::new();
-
-    let apply_result = match repository.stash_apply(stash_index, Some(&mut apply_options)) {
-        Ok(_) => {
-            // If pop is requested, also drop the stash
-            if pop {
-                match repository.stash_drop(stash_index) {
-                    Ok(_) => json!(format!(
-                        "Applied stash@{{{}}}, then dropped it",
-                        stash_index
-                    )),
-                    Err(e) => json!(format!(
-                        "Applied stash@{{{}}}, but failed to drop it: {}",
-                        stash_index, e
-                    )),
-                }
-            } else {
-                json!(format!("Applied stash@{{{}}}", stash_index))
-            }
+    
+    let mut cmd = Command::new("git");
+    cmd.current_dir(current_dir);
+    
+    if pop {
+        cmd.arg("stash")
+           .arg("pop");
+    } else {
+        cmd.arg("stash")
+           .arg("apply");
+    }
+    
+    // Add stash reference if not the default
+    if stash_index > 0 {
+        cmd.arg(format!("stash@{{{}}}", stash_index));
+    }
+    
+    let output = run_git_command(cmd).await;
+    
+    // Check if the command was successful
+    if let Some(result) = output.as_str() {
+        if result.contains("error") || result.contains("fatal") {
+            return output;
         }
-        Err(e) => json!(format!("Failed to apply stash@{{{}}}: {}", stash_index, e)),
-    };
-
-    apply_result
+        
+        if pop {
+            return serde_json::json!(format!("Applied stash@{{{}}}, then dropped it", stash_index));
+        } else {
+            return serde_json::json!(format!("Applied stash@{{{}}}", stash_index));
+        }
+    }
+    
+    output
 }

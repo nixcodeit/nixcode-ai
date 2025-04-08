@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize)]
@@ -66,7 +67,13 @@ pub async fn search_glob_files(params: GlobToolParams, project: Arc<Project>) ->
 
             let cwd = project.get_cwd().clone();
             let paths = tokio::task::spawn_blocking(move || {
-                let repository = git2::Repository::discover(project.get_cwd().as_path()).ok();
+                // Check if we're in a git repository
+                let is_git_repo = Command::new("git")
+                    .current_dir(&project.get_cwd())
+                    .args(["rev-parse", "--is-inside-work-tree"])
+                    .output()
+                    .map(|output| output.status.success())
+                    .unwrap_or(false);
 
                 paths
                     .iter()
@@ -91,9 +98,18 @@ pub async fn search_glob_files(params: GlobToolParams, project: Arc<Project>) ->
                             return false;
                         }
 
-                        if let Some(repo) = &repository {
-                            if repo.is_path_ignored(path).unwrap_or(false) {
-                                return false;
+                        // Check if file is ignored by git
+                        if is_git_repo && !include_git {
+                            let output = Command::new("git")
+                                .current_dir(&cwd)
+                                .args(["check-ignore", "-q", path])
+                                .output();
+                            
+                            if let Ok(output) = output {
+                                // If the command succeeds (exit code 0), the file is ignored
+                                if output.status.success() {
+                                    return false;
+                                }
                             }
                         }
 
