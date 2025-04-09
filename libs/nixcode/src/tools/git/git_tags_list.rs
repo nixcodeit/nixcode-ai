@@ -26,15 +26,14 @@ pub async fn git_tags_list(props: GitTagsListProps, project: Arc<Project>) -> se
     let pattern = props.pattern.as_deref();
     let sort_by_date = props.sort_by_date.unwrap_or(false);
     let show_messages = props.show_messages.unwrap_or(false);
-    
+
     let mut cmd = Command::new("git");
     cmd.current_dir(current_dir);
-    
+
     if show_messages {
         // For showing messages, we need to use a different format
-        cmd.arg("tag")
-           .arg("-n"); // Show annotation message
-        
+        cmd.arg("tag").arg("-n"); // Show annotation message
+
         if sort_by_date {
             // We'll need to do a separate command for sorting by date
             cmd.arg("--sort=-creatordate"); // Sort by date, newest first
@@ -42,29 +41,28 @@ pub async fn git_tags_list(props: GitTagsListProps, project: Arc<Project>) -> se
     } else {
         // Simple tag listing
         cmd.arg("tag");
-        
+
         if sort_by_date {
             cmd.arg("--sort=-creatordate"); // Sort by date, newest first
         }
     }
-    
+
     // Add pattern if specified
     if let Some(pattern_str) = pattern {
-        cmd.arg("--list")
-           .arg(pattern_str);
+        cmd.arg("--list").arg(pattern_str);
     }
-    
+
     let output = run_git_command(cmd).await;
-    
+
     // Format the output
     if let Some(result) = output.as_str() {
         if result.trim().is_empty() {
             return serde_json::json!("No tags found");
         }
-        
+
         let formatted = format!("Tags:\n{}", result);
         return serde_json::json!(formatted);
     }
-    
+
     output
 }

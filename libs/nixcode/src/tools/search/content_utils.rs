@@ -102,7 +102,7 @@ pub async fn filter_paths(
                         .current_dir(&cwd)
                         .args(["check-ignore", "-q", rel_path])
                         .output();
-                    
+
                     if let Ok(output) = output {
                         // If the command succeeds (exit code 0), the file is ignored
                         if output.status.success() {

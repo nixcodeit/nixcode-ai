@@ -1,6 +1,4 @@
-use crate::models::llm_model::{
-    DeepSeekV3, Gpt3oMini, LLMModel, Llama4, Sonnet37,
-};
+use crate::models::llm_model::{DeepSeekV3, Gpt3oMini, LLMModel, Llama4, Sonnet37};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]

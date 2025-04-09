@@ -1,5 +1,4 @@
 use serde_json::json;
-use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -36,14 +35,14 @@ pub async fn run_git_command(mut command: Command) -> serde_json::Value {
     }
 
     let exit_code = child.wait().await;
-    
+
     if let Ok(status) = exit_code {
         if status.success() {
             // If the command was successful, just return the output
             return json!(output.trim());
         }
     }
-    
+
     // If there was an error, include the exit code
     let exit_code = match exit_code {
         Ok(code) => code.to_string(),
@@ -52,18 +51,4 @@ pub async fn run_git_command(mut command: Command) -> serde_json::Value {
 
     let text_result = format!("{}\n\nExit code: {}", output, exit_code);
     json!(text_result)
-}
-
-/// Check if the current directory is a git repository
-pub async fn is_git_repository(path: Option<PathBuf>) -> bool {
-    if let Some(repo_path) = path {
-        let mut cmd = Command::new("git");
-        cmd.current_dir(repo_path).arg("rev-parse").arg("--is-inside-work-tree");
-        
-        let output = run_git_command(cmd).await;
-        if let Some(result) = output.as_str() {
-            return result.trim() == "true";
-        }
-    }
-    false
 }

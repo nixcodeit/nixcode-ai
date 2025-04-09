@@ -19,22 +19,20 @@ pub async fn git_stash_list(
     project: Arc<Project>,
 ) -> serde_json::Value {
     let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
-    
+
     let mut cmd = Command::new("git");
-    cmd.current_dir(current_dir)
-       .arg("stash")
-       .arg("list");
-    
+    cmd.current_dir(current_dir).arg("stash").arg("list");
+
     let output = run_git_command(cmd).await;
-    
+
     // Check if the command was successful
     if let Some(result) = output.as_str() {
         if result.trim().is_empty() {
             return serde_json::json!("No stashes found");
         }
-        
+
         return output;
     }
-    
+
     output
 }

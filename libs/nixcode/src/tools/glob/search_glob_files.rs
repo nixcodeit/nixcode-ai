@@ -104,7 +104,7 @@ pub async fn search_glob_files(params: GlobToolParams, project: Arc<Project>) ->
                                 .current_dir(&cwd)
                                 .args(["check-ignore", "-q", path])
                                 .output();
-                            
+
                             if let Ok(output) = output {
                                 // If the command succeeds (exit code 0), the file is ignored
                                 if output.status.success() {

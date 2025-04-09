@@ -1,11 +1,9 @@
 use crate::project::Project;
 use crate::tools::github;
 use nixcode_macros::tool;
-use reqwest::Url;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::str::FromStr;
 use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize, Debug)]

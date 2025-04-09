@@ -18,7 +18,7 @@ pub async fn git_status(_: GitGetTreeProps, project: Arc<Project>) -> serde_json
     let mut cmd = Command::new("git");
     cmd.current_dir(current_dir)
         .arg("status")
-        .arg("--porcelain");  // Removed -z flag to get newline-separated output
+        .arg("--porcelain"); // Removed -z flag to get newline-separated output
 
     let output = run_git_command(cmd).await;
 

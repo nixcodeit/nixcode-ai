@@ -37,7 +37,7 @@ impl Project {
                 .args(["rev-parse", "--show-toplevel"])
                 .output()
                 .ok();
-            
+
             if let Some(output) = output {
                 if output.status.success() {
                     if let Ok(path) = String::from_utf8(output.stdout) {

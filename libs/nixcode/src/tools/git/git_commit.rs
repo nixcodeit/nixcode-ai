@@ -17,15 +17,15 @@ pub struct GitCommitProps {
 #[tool("Commit changes")]
 pub async fn git_commit(props: GitCommitProps, project: Arc<Project>) -> serde_json::Value {
     let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
-    
+
     let mut cmd = Command::new("git");
     cmd.current_dir(current_dir)
-       .arg("commit")
-       .arg("-m")
-       .arg(&props.message);
-    
+        .arg("commit")
+        .arg("-m")
+        .arg(&props.message);
+
     let output = run_git_command(cmd).await;
-    
+
     // If the command was successful but had no clear output, provide a standard message
     if let Some(result) = output.as_str() {
         if result.contains("nothing to commit") {
@@ -35,6 +35,6 @@ pub async fn git_commit(props: GitCommitProps, project: Arc<Project>) -> serde_j
             return serde_json::json!("Commit created");
         }
     }
-    
+
     output
 }

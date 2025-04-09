@@ -27,15 +27,15 @@ pub struct GitLogProps {
 pub async fn git_log(props: GitLogProps, project: Arc<Project>) -> serde_json::Value {
     let current_dir = project.get_repo_path().unwrap_or(project.get_cwd());
     let limit = props.limit.unwrap_or(50); // Default to 50 commits
-    
+
     let mut cmd = Command::new("git");
     cmd.current_dir(current_dir)
-       .arg("log")
-       .arg("--pretty=format:(%h) by: %an <%ae> [%ad]%n%s%n%b")
-       .arg("--date=format:%Y-%m-%d %H:%M:%S")
-       .arg("-n")
-       .arg(limit.to_string());
-    
+        .arg("log")
+        .arg("--pretty=format:(%h) by: %an <%ae> [%ad]%n%s%n%b")
+        .arg("--date=format:%Y-%m-%d %H:%M:%S")
+        .arg("-n")
+        .arg(limit.to_string());
+
     // Add range if specified
     if props.from_ref.is_some() || props.to_ref.is_some() {
         let range = match (&props.from_ref, &props.to_ref) {
@@ -46,23 +46,23 @@ pub async fn git_log(props: GitLogProps, project: Arc<Project>) -> serde_json::V
         };
         cmd.arg(range);
     }
-    
+
     // Add path if specified
     if let Some(path) = &props.path {
         cmd.arg("--").arg(path);
     }
-    
+
     let output = run_git_command(cmd).await;
-    
+
     // Format the output
     if let Some(result) = output.as_str() {
         if result.trim().is_empty() {
             return serde_json::json!("No commits found");
         }
-        
+
         // The git log command already formats the output as we want
         return output;
     }
-    
+
     output
 }
