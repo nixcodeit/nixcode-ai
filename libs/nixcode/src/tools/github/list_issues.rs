@@ -1,4 +1,5 @@
 use crate::project::Project;
+use crate::tools::github::validate_repo_params;
 use nixcode_macros::tool;
 use octocrab::params;
 use schemars::JsonSchema;
@@ -25,18 +26,10 @@ pub async fn github_issues_list(
     project: Arc<Project>,
 ) -> serde_json::Value {
     log::debug!("github_issues_list({:?})", params);
-    let project_github = project.get_github();
-    let org = params
-        .org
-        .or_else(|| project_github.clone().and_then(|p| p.org));
-    let repo = params
-        .repo
-        .or_else(|| project_github.clone().and_then(|p| p.repo));
-    if org.is_none() || repo.is_none() {
-        return json!("GitHub organization or repository not specified");
-    }
-    let org = org.unwrap();
-    let repo = repo.unwrap();
+    let (org, repo) = match validate_repo_params(&params.org, &params.repo, project) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
     let client = octocrab::instance();
     let issues = client
         .issues(org, repo)

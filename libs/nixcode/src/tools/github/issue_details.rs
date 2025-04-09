@@ -1,9 +1,10 @@
 use crate::project::Project;
+use crate::tools::github;
 use nixcode_macros::tool;
 use octocrab::models::IssueState;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[derive(JsonSchema, Serialize, Deserialize, Debug)]
@@ -26,21 +27,13 @@ pub struct GithubIssueDetailsParams {
 pub async fn github_issue_details(
     params: GithubIssueDetailsParams,
     project: Arc<Project>,
-) -> serde_json::Value {
+) -> Value {
     log::debug!("get_issue_details({:?})", params);
-    let project_github = project.get_github();
-    let org = params
-        .org
-        .or_else(|| project_github.clone().and_then(|p| p.org));
-    let repo = params
-        .repo
-        .or_else(|| project_github.clone().and_then(|p| p.repo));
-    if org.is_none() || repo.is_none() {
-        return json!("GitHub organization or repository not specified");
-    }
+    let (org, repo) = match github::validate_repo_params(&params.org, &params.repo, project) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
 
-    let org = org.unwrap();
-    let repo = repo.unwrap();
     let client = octocrab::instance();
     let issue = client.issues(org, repo).get(params.issue_id).await;
 
