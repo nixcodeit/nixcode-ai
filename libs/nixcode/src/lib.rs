@@ -38,10 +38,10 @@ use crate::tools::git::git_tag_create::GitTagCreateTool;
 use crate::tools::git::git_tags_list::GitTagsListTool;
 use crate::tools::github::add_comment_to_pull_request::GithubAddPullRequestCommentTool;
 use crate::tools::github::create_pull_request::GithubCreatePullRequestTool;
+use crate::tools::github::get_pr_diff::GithubPrDiffTool;
 use crate::tools::github::issue_details::GithubIssueDetailsTool;
 use crate::tools::github::list_issues::GithubIssuesListTool;
 use crate::tools::glob::search_glob_files::SearchGlobFilesTool;
-use crate::tools::prompt::get_code_review_prompt::GetCodeReviewInstructionsTool;
 use crate::tools::prompt::get_project_analysis_prompt::GetProjectAnalysisPromptTool;
 use crate::tools::search::replace_content::ReplaceContentTool;
 use crate::tools::search::search_content::SearchContentTool;
@@ -124,6 +124,7 @@ impl Nixcode {
                 tools.add_tool(Arc::new(GithubIssueDetailsTool {}));
                 tools.add_tool(Arc::new(GithubCreatePullRequestTool {}));
                 tools.add_tool(Arc::new(GithubAddPullRequestCommentTool {}));
+                tools.add_tool(Arc::new(GithubPrDiffTool {}));
 
                 if has_repo_path {
                     tools.add_tool(Arc::new(GitAddTool {}));
@@ -151,8 +152,6 @@ impl Nixcode {
                 if !has_init_analysis {
                     tools.add_tool(Arc::new(GetProjectAnalysisPromptTool {}));
                 }
-
-                tools.add_tool(Arc::new(GetCodeReviewInstructionsTool {}));
 
                 tools
             },

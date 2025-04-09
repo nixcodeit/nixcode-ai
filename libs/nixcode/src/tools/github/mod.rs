@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 pub mod add_comment_to_pull_request;
 pub mod create_pull_request;
-mod get_pr_diff;
+pub mod get_pr_diff;
 pub mod issue_details;
 pub mod list_issues;
 
