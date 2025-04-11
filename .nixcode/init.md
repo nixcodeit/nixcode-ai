@@ -2,16 +2,17 @@
 
 ## Project Overview
 
-nixcode-ai is a terminal-based client for interacting with Large Language Models (LLMs), with support for multiple providers including Anthropic (Claude), OpenAI (GPT models), Groq, OpenRouter, and Gemini. It's a Rust-based TUI (Text User Interface) application that provides a modern, terminal-friendly interface for communicating with AI assistants directly from the command line. The application features a vim-inspired input system, a chat interface, and an innovative tool invocation framework that allows the AI to use external tools.
+nixcode-ai is a terminal-based client for interacting with Large Language Models (LLMs), with support for multiple providers including Anthropic (Claude), OpenAI (GPT models), Groq, OpenRouter, and Gemini. It's a Rust-based TUI (Text User Interface) application that provides a modern, terminal-friendly interface for communicating with AI assistants directly from the command line. The application features a vim-inspired input system, a chat interface, and an innovative tool invocation framework that allows the AI to use external tools. The project also includes a web application interface built with React and TypeScript.
 
 ## Architecture
 
 The project follows a modular architecture organized as a Rust workspace with multiple packages:
 
-1. **Main Application (apps/nixcode-cli)**: The terminal interface and user interaction layer
-2. **LLM SDK Library (libs/llm_sdk)**: API client for LLM providers (Anthropic, OpenAI, Groq, OpenRouter, Gemini)
-3. **Core Library (libs/nixcode)**: Core functionality including tools, utilities and event management
-4. **Procedural Macros (libs/nixcode-macros)**: Custom macros for the project
+1. **Terminal Interface (apps/nixcode-cli)**: The main terminal interface and user interaction layer
+2. **Web Interface (apps/web)**: A React-based web application for accessing the LLM functionality
+3. **LLM SDK Library (libs/llm_sdk)**: API client for LLM providers (Anthropic, OpenAI, Groq, OpenRouter, Gemini)
+4. **Core Library (libs/nixcode)**: Core functionality including tools, utilities and event management
+5. **Procedural Macros (libs/nixcode-macros)**: Custom macros for the project
 
 The application follows an event-driven architecture where:
 - UI events are captured and processed by the main app
@@ -41,6 +42,31 @@ The application follows an event-driven architecture where:
 - **status_bar.rs**: Status bar displaying the current input mode, application version, and date/time
 - **popup_utils.rs**: Utilities for creating and positioning popup dialogs in the UI
 - **utils/highlights.rs**: Syntax highlighting for code blocks
+
+#### web (Web Interface)
+- **src/App.tsx**: Main application component 
+- **src/main.tsx**: Entry point for the web application
+- **src/components/ui/**: Comprehensive UI component library including:
+  - Form controls (inputs, textarea, checkbox, etc.)
+  - Navigation components (accordion, tabs, navigation menu)
+  - Feedback components (alert, progress, toast)
+  - Layout components (card, drawer, sheet, sidebar)
+  - Data display components (table, avatar, chart)
+  - Overlay components (modal, popover, tooltip)
+- **src/hooks/**: Custom React hooks
+  - **use-mobile.ts**: Hook for responsive design and mobile detection
+- **src/lib/**: Utility functions and helpers
+  - **utils.ts**: General utility functions
+- **src/css/**: Styling
+  - **colors.css**: Color definitions and theme variables
+
+The web application is built with:
+- **React 19**: For component-based UI development
+- **TypeScript**: For type-safe development
+- **Vite**: As the build tool and development server
+- **Tailwind CSS**: For utility-first styling
+- **Radix UI**: For accessible, unstyled component primitives
+- **Recharts**: For data visualization
 
 ### Libraries
 
@@ -216,12 +242,17 @@ The project includes comprehensive documentation organized by component:
 
 ## Workflow
 
-1. **User Input Flow**:
+1. **Terminal Interface Input Flow**:
    - User types in the terminal interface
    - Input is processed based on the current input mode (Normal, Insert, Command)
    - Commands are executed or messages are sent to the Nixcode component
 
-2. **LLM Interaction Flow**:
+2. **Web Interface Input Flow**:
+   - User interacts with the React-based web interface
+   - Input is captured through forms and UI components
+   - Requests are processed and sent to the core system
+
+3. **LLM Interaction Flow**:
    - Messages are sent to the LLM via the appropriate provider's API
    - Responses are streamed back via the event system
    - Events are dispatched through the standardized event channels
@@ -229,7 +260,7 @@ The project includes comprehensive documentation organized by component:
    - UI updates in response to events
    - Input costs are tracked and displayed based on model-specific cost calculations
 
-3. **Tool Execution Flow**:
+4. **Tool Execution Flow**:
    - LLM response may include tool invocation requests
    - Tool requests are identified and executed based on configuration
    - Tool execution status is communicated via events
@@ -239,10 +270,14 @@ The project includes comprehensive documentation organized by component:
 ## Technology Stack
 
 ### Programming Languages and Core Frameworks
-- **Rust**: Primary language
+- **Rust**: Primary language for backend and terminal UI
+- **TypeScript/JavaScript**: For web frontend
+- **React**: For web UI component framework
 - **ratatui**: Terminal UI framework
 - **tokio**: Async runtime
 - **crossterm**: Terminal handling
+- **Vite**: Web build tool and development server
+- **Tailwind CSS**: Utility-first CSS framework
 
 ### External APIs
 - **Anthropic API**: For Claude AI models (Sonnet, Haiku)
@@ -252,6 +287,7 @@ The project includes comprehensive documentation organized by component:
 - **Gemini API**: For Google's Gemini models
 
 ### Key Dependencies
+#### Backend & Terminal UI
 - **reqwest**: HTTP client for API communication
 - **serde**: Serialization/deserialization
 - **tokio-stream**: Async streaming
@@ -263,17 +299,29 @@ The project includes comprehensive documentation organized by component:
 - **lazy_static**: Lazy initialization of static variables
 - **simple-logging**: Logging framework
 
+#### Web Frontend
+- **React**: UI component library
+- **Radix UI**: Accessible UI primitives
+- **Tailwind CSS**: Utility-first styling
+- **Recharts**: Data visualization
+- **React Hook Form**: Form handling
+- **Zod**: Schema validation
+- **date-fns**: Date utility library
+- **clsx/tailwind-merge**: Conditional CSS class utilities
+
 ## Organization Patterns
 
 ### File Structure
-- Workspace-based organization with clear separation between app and libraries
+- Workspace-based organization with clear separation between apps and libraries
 - Modular approach with specific responsibilities per module
 - Feature-based organization within each package
 - Provider-specific code is organized in dedicated modules
 - Capability-based model definitions
+- Component-based organization in the web application
 
 ### Code Conventions
-- Standard Rust naming conventions (snake_case for variables/functions, CamelCase for types)
+- **Rust**: Standard Rust naming conventions (snake_case for variables/functions, CamelCase for types)
+- **TypeScript/React**: Standard React naming conventions (PascalCase for components)
 - Trait-based abstractions for flexibility
 - Event-driven architecture for UI and async operations
 - Clear separation between UI rendering and business logic
@@ -298,6 +346,7 @@ The project follows the Angular Commit Convention for consistent and descriptive
 - Streaming responses from LLM
 - Tool invocation via standardized interfaces
 - Cost calculation for token usage based on model-specific pricing
+- React component state and props for web UI data flow
 
 ## Configuration System
 
@@ -390,7 +439,9 @@ Each model has specific capabilities and cost calculation methods associated wit
 
 3. **Event Flow**: The app uses a standardized event system with `NixcodeEvent` enums and channels for communication between components. Understanding this flow helps with making modifications.
 
-4. **UI Rendering**: The TUI rendering in `apps/nixcode-cli/src/widgets/` follows ratatui patterns with careful state management for scrolling and layout.
+4. **UI Rendering**: 
+   - The TUI rendering in `apps/nixcode-cli/src/widgets/` follows ratatui patterns with careful state management for scrolling and layout.
+   - The web UI in `apps/web/src/components/` follows React component patterns with props for configuration.
 
 5. **LLM Integration**: Study the client modules in `libs/llm_sdk/src/client/` to understand how the application communicates with different LLM providers. Each provider has a modular implementation with dedicated files for client, request, and stream handling.
 
@@ -405,7 +456,8 @@ Each model has specific capabilities and cost calculation methods associated wit
 
 8. **Adding Features**: When adding new functionality, follow the existing modular patterns:
    - For new tools, add to appropriate category in `libs/nixcode/src/tools/`
-   - For UI components, extend `apps/nixcode-cli/src/widgets/`
+   - For terminal UI components, extend `apps/nixcode-cli/src/widgets/`
+   - For web UI components, extend `apps/web/src/components/`
    - For LLM provider integrations, create a new module in `libs/llm_sdk/src/client/`
    - For new events, extend the `NixcodeEvent` enum in `libs/nixcode/src/events/mod.rs`
 
@@ -430,3 +482,10 @@ Each model has specific capabilities and cost calculation methods associated wit
     - Use these tools to maintain code quality and automate repetitive tasks
     - Understand how the command execution works in the `commands/mod.rs` file
     - Consider adding more Rust-specific tools as needed
+
+14. **Web Application Development**: When working on the web application:
+    - Follow the established component structure in `apps/web/src/components/`
+    - Use the UI component library for consistent styling and behavior
+    - Consider how the web UI will interact with the core functionality
+    - Maintain consistent styling using Tailwind utility classes
+    - Use TypeScript for type safety
