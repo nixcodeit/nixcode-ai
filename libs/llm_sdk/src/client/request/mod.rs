@@ -5,6 +5,7 @@ use crate::message::message::Message;
 use crate::tools::Tool;
 use crate::ThinkingOptions;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
@@ -18,11 +19,34 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking: Option<ThinkingOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tools: Option<Vec<Tool>>,
+    tools: Option<Vec<AnthropicTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<Vec<Content>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stop_sequences: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnthropicTool {
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
+}
+
+impl From<Tool> for AnthropicTool {
+    fn from(tool: Tool) -> Self {
+        AnthropicTool {
+            name: tool.name,
+            description: tool.description,
+            input_schema: serde_json::to_value(&tool.input).unwrap(),
+        }
+    }
+}
+
+impl From<&Tool> for AnthropicTool {
+    fn from(value: &Tool) -> Self {
+        Self::from(value.clone())
+    }
 }
 
 impl TryFrom<&LLMRequest> for Request {
@@ -34,6 +58,14 @@ impl TryFrom<&LLMRequest> for Request {
             messages.push(Message::try_from(message)?);
         }
 
+        let tools = request
+            .tools
+            .clone()
+            .unwrap_or_default()
+            .iter()
+            .map(|i| AnthropicTool::from(i))
+            .collect::<Vec<_>>();
+
         Ok(Request {
             model: request.model.model_name().to_string(),
             messages,
@@ -41,7 +73,7 @@ impl TryFrom<&LLMRequest> for Request {
             temperature: request.temperature,
             stream: request.stream,
             thinking: None,
-            tools: request.tools.clone(),
+            tools: Some(tools),
             system: request.system.clone().map(|c| vec![Content::new_text(c)]),
             stop_sequences: request.stop_sequences.clone(),
         })
@@ -95,7 +127,7 @@ impl Request {
         self
     }
 
-    pub fn with_tools(mut self, tools: Vec<Tool>) -> Self {
+    pub fn with_tools(mut self, tools: Vec<AnthropicTool>) -> Self {
         self.tools = Some(tools);
         self
     }
@@ -113,7 +145,7 @@ impl Request {
         &self.system
     }
 
-    pub fn get_tools(&self) -> &Option<Vec<Tool>> {
+    pub fn get_tools(&self) -> &Option<Vec<AnthropicTool>> {
         &self.tools
     }
 

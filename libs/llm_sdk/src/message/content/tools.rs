@@ -27,13 +27,6 @@ pub struct ToolUseContent {
 }
 
 impl ToolUseContent {
-    pub fn create_response(&self, content: impl Into<String>) -> ToolResultContent {
-        ToolResultContent {
-            tool_use_id: self.id.clone(),
-            content: content.into(),
-        }
-    }
-
     pub fn name_is(&self, name: impl Into<String>) -> bool {
         self.name == name.into()
     }
@@ -71,6 +64,8 @@ impl AddAssign<ContentInputJsonDelta> for ToolUseContent {
 pub struct ToolResultContent {
     pub tool_use_id: String,
     pub content: String,
+    #[serde(skip)]
+    pub name: String,
 }
 
 impl ToolResultContent {

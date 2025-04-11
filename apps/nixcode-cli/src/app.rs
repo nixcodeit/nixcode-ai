@@ -27,7 +27,7 @@ pub enum AppEvent {
     RemoveLastMessage,
     ClearChat,
     ShowModelPopup,
-    ChangeModel(&'static LLMModel),
+    ChangeModel(Arc<LLMModel>),
     Quit,
     Render,
     ChatError(ErrorEventContent),
@@ -297,7 +297,7 @@ impl App {
         self.model_popup = Some(ModelPopup::new(self.tx.clone(), current_model));
     }
 
-    async fn change_model(&mut self, model: &'static LLMModel) {
+    async fn change_model(&mut self, model: Arc<LLMModel>) {
         if self.is_changing_model {
             return; // Prevent concurrent model changes
         }
@@ -318,6 +318,8 @@ impl App {
                 LLMProvider::Groq => "groq",
                 LLMProvider::OpenRouter => "open_router",
                 LLMProvider::Gemini => "gemini",
+                LLMProvider::GenAI => "genai",
+                LLMProvider::Llama => "ollama",
             };
 
             // Set the default provider in the config to match the model's provider
@@ -327,7 +329,7 @@ impl App {
             match Nixcode::new_with_config(project, config) {
                 Ok((new_rx, client)) => {
                     // Update the client with the new model
-                    let nixcode = Arc::new(client.with_model(model));
+                    let nixcode = Arc::new(client.with_model(model.clone()));
 
                     // Update the current Nixcode instance
                     self.nixcode = nixcode.clone();

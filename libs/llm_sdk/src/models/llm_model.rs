@@ -8,7 +8,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
 lazy_static! {
-    pub static ref Sonnet37: LLMModel = LLMModelBuilder::new()
+    pub static ref Sonnet37: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("claude-3-7-sonnet-latest")
         .display_name("Claude 3.7 Sonnet")
         .provider(LLMProvider::Anthropic)
@@ -21,7 +21,7 @@ lazy_static! {
         )
         .cost_calculation(Arc::new(sonnet37_cost_calculation))
         .build();
-    pub static ref Haiku35: LLMModel = LLMModelBuilder::new()
+    pub static ref Haiku35: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("claude-3-5-haiku-latest")
         .display_name("Claude 3.5 Haiku")
         .provider(LLMProvider::Anthropic)
@@ -34,69 +34,82 @@ lazy_static! {
         )
         .cost_calculation(Arc::new(haiku35_cost_calculation))
         .build();
-    pub static ref Gpt4o: LLMModel = LLMModelBuilder::new()
+    pub static ref Gpt4o: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("gpt-4o")
         .display_name("4o")
         .provider(LLMProvider::OpenAI)
         .cost_calculation(Arc::new(o4_cost_calculation))
         .build();
-    pub static ref Gpt3oMini: LLMModel = LLMModelBuilder::new()
+    pub static ref Gpt3oMini: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("o3-mini")
         .display_name("o3 Mini")
         .provider(LLMProvider::OpenAI)
         .cost_calculation(Arc::new(o3mini_cost_calculation))
         .build();
-    pub static ref Llama4: LLMModel = LLMModelBuilder::new()
+    pub static ref Llama4: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("meta-llama/llama-4-scout-17b-16e-instruct")
         .display_name("Llama 4 Scout")
         .provider(LLMProvider::Groq)
         .cost_calculation(Arc::new(llama4_scout_cost_calculation))
         .build();
-    pub static ref QwenQwq32b: LLMModel = LLMModelBuilder::new()
+    pub static ref QwenQwq32b: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("qwen-qwq-32b")
         .display_name("Qwen Qwq 32b")
         .provider(LLMProvider::Groq)
         .cost_calculation(Arc::new(qwen_qwq_32b_cost_calculation))
         .build();
-    pub static ref QuasarAlpha: LLMModel = LLMModelBuilder::new()
+    pub static ref QuasarAlpha: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("openrouter/quasar-alpha")
         .display_name("Quasar Alpha")
         .provider(LLMProvider::OpenRouter)
         .build();
-    pub static ref Llama4OpenRouter: LLMModel = LLMModelBuilder::new()
+    pub static ref Llama4OpenRouter: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("meta-llama/llama-4-scout")
         .display_name("Llama 4 Scout")
         .provider(LLMProvider::OpenRouter)
         .build();
-    pub static ref Gemini25Pro: LLMModel = LLMModelBuilder::new()
+    pub static ref Gemini25Pro: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("google/gemini-2.5-pro-preview-03-25")
         .display_name("Google: Gemini 2.5 Pro Preview")
         .provider(LLMProvider::OpenRouter)
         .build();
-    pub static ref DeepSeekV3: LLMModel = LLMModelBuilder::new()
+    pub static ref DeepSeekV3: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("deepseek/deepseek-chat")
         .display_name("DeepSeek V3")
         .cost_calculation(Arc::new(deepseek_v3_cost_calulcation))
         .provider(LLMProvider::OpenRouter)
         .build();
-    pub static ref DeepSeekR1: LLMModel = LLMModelBuilder::new()
+    pub static ref DeepSeekR1: Arc<LLMModel> = LLMModelBuilder::new()
         .model_name("deepseek-r1-distill-llama-70b")
         .display_name("DeepSeek R1")
         .provider(LLMProvider::Groq)
         .cost_calculation(Arc::new(deepseek_r1_cost_calculation))
         .build();
-    pub static ref AllModels: Vec<&'static LLMModel> = vec![
-        &Sonnet37,
-        &Haiku35,
-        &Gpt4o,
-        &Gpt3oMini,
-        &Llama4,
-        &QwenQwq32b,
-        &QuasarAlpha,
-        &Llama4OpenRouter,
-        &DeepSeekV3,
-        &DeepSeekR1,
-        &Gemini25Pro,
+    pub static ref Gemini20Flash: Arc<LLMModel> = LLMModelBuilder::new()
+        .model_name("gemini-2.0-flash")
+        .display_name("Gemini 2.0 Flash")
+        .provider(LLMProvider::GenAI)
+        .cost_calculation(Arc::new(gemini20flash_cost_calculation))
+        .build();
+    pub static ref Gemini20FlashThinking: Arc<LLMModel> = LLMModelBuilder::new()
+        .model_name("gemini-2.0-flash-thinking-exp-01-21")
+        .display_name("Gemini 2.0 Flash Thinking Experimental")
+        .provider(LLMProvider::GenAI)
+        .build();
+    pub static ref AllModels: Vec<Arc<LLMModel>> = vec![
+        Sonnet37.clone(),
+        Haiku35.clone(),
+        Gpt4o.clone(),
+        Gpt3oMini.clone(),
+        Llama4.clone(),
+        QwenQwq32b.clone(),
+        QuasarAlpha.clone(),
+        Llama4OpenRouter.clone(),
+        DeepSeekV3.clone(),
+        DeepSeekR1.clone(),
+        Gemini25Pro.clone(),
+        Gemini20Flash.clone(),
+        Gemini20FlashThinking.clone(),
     ];
 }
 
@@ -140,6 +153,12 @@ fn o4_cost_calculation(usage: Usage) -> f64 {
     let input_cost = usage.input_tokens as f64 / 1_000_000.0 * 2.50;
     let output_cost = usage.output_tokens as f64 / 1_000_000.0 * 10.00;
     (create_input_cache_cost + read_input_cache_cost + input_cost + output_cost).max(0.0)
+}
+
+fn gemini20flash_cost_calculation(usage: Usage) -> f64 {
+    let input_cost = usage.input_tokens as f64 / 1_000_000.0 * 0.1;
+    let output_cost = usage.output_tokens as f64 / 1_000_000.0 * 0.4;
+    (input_cost + output_cost).max(0.0)
 }
 
 pub type CostCalculation = Arc<dyn Fn(Usage) -> f64 + Send + Sync>;
@@ -198,19 +217,24 @@ impl LLMModelBuilder {
         self
     }
 
-    pub fn build(self) -> LLMModel {
-        LLMModel {
+    pub fn build(self) -> Arc<LLMModel> {
+        Arc::new(LLMModel {
             display_name: self.display_name.unwrap_or_default(),
             model_name: self.model_name.unwrap_or_default(),
             provider: self.provider,
             cost_calculation: self.cost_calculation.unwrap_or_else(|| Arc::new(|_| 0.0)),
             capabilities: self.capabilities.unwrap_or_else(|| Default::default()),
-        }
+        })
     }
 }
 
 impl Display for LLMModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display_name = self.display_name.clone();
+        if display_name.is_empty() {
+            return f.write_str(&self.model_name);
+        }
+
         f.write_str(self.display_name.as_ref())
     }
 }

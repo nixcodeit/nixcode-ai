@@ -5,12 +5,13 @@ use crate::message::openai::{OpenAIChoice, OpenAIMessageToolCall, OpenAIResponse
 use crate::models::llm_model::LLMModel;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
 /// Process a streaming response from OpenAI
 pub async fn process_stream(
-    model: &'static LLMModel,
+    model: Arc<LLMModel>,
     response: reqwest::Response,
 ) -> UnboundedReceiver<LLMEvent> {
     let (tx, rx) = unbounded_channel::<LLMEvent>();

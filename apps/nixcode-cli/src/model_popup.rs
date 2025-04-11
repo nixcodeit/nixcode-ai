@@ -8,20 +8,21 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Margin, Rect};
 use ratatui::prelude::{Color, Modifier, Style, Stylize, Widget};
 use ratatui::widgets::{Block, BorderType, Borders, Clear};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct ModelPopup {
     tx: UnboundedSender<AppEvent>,
     selected_index: usize,
-    current_model: &'static LLMModel,
+    current_model: Arc<LLMModel>,
 }
 
 impl ModelPopup {
-    pub fn new(tx: UnboundedSender<AppEvent>, current_model: &'static LLMModel) -> Self {
+    pub fn new(tx: UnboundedSender<AppEvent>, current_model: Arc<LLMModel>) -> Self {
         // Find the index of the current model
         let selected_index = AllModels
             .iter()
-            .position(|&model| model.model_name() == current_model.model_name())
+            .position(|model| model.model_name() == current_model.model_name())
             .unwrap_or(0);
 
         Self {
@@ -40,8 +41,8 @@ impl ModelPopup {
                     }
                     KeyCode::Enter => {
                         // Select the current model
-                        if let Some(&model) = AllModels.get(self.selected_index) {
-                            self.tx.send(AppEvent::ChangeModel(model)).ok();
+                        if let Some(model) = AllModels.get(self.selected_index) {
+                            self.tx.send(AppEvent::ChangeModel(model.clone())).ok();
                         }
                         return false; // Close popup after selection
                     }
@@ -104,7 +105,7 @@ impl Widget for &ModelPopup {
         });
 
         // Render model list
-        for (i, &model) in AllModels.iter().enumerate() {
+        for (i, model) in AllModels.iter().enumerate() {
             let is_selected = i == self.selected_index;
             let is_current = model.model_name() == self.current_model.model_name();
 
@@ -176,6 +177,7 @@ fn get_provider_color(provider: &LLMProvider) -> Color {
         LLMProvider::OpenAI => Color::Rgb(16, 163, 127),    // Green
         LLMProvider::Groq => Color::Rgb(255, 165, 0),       // Orange
         LLMProvider::OpenRouter => Color::Rgb(59, 130, 246), // Blue
-        LLMProvider::Gemini => Color::Rgb(234, 67, 53),     // Red
+        LLMProvider::Gemini | LLMProvider::GenAI => Color::Rgb(234, 67, 53), // Red
+        LLMProvider::Llama => Color::Rgb(255, 255, 255),    // White
     }
 }

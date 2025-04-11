@@ -8,7 +8,7 @@ mod utils;
 use crate::config::Config;
 use crate::events::NixcodeEvent;
 use crate::project::Project;
-use crate::prompts::system::SYSTEM_PROMPT;
+use crate::prompts::system::{MANAGER_AGENT, MANAGER_AGENT_2, MANAGER_AGENT_3, SYSTEM_PROMPT};
 use crate::tools::commands::cargo_build::CargoBuildTool;
 use crate::tools::commands::cargo_fix::CargoFixTool;
 use crate::tools::commands::cargo_fmt::CargoFmtTool;
@@ -66,7 +66,7 @@ use tokio::sync::RwLock;
 pub struct Nixcode {
     project: Arc<Project>,
     client: LLMClient,
-    model: &'static LLMModel,
+    model: Arc<LLMModel>,
     tools: Tools,
     config: Config,
     messages: RwLock<Vec<LLMMessage>>,
@@ -196,6 +196,8 @@ impl Nixcode {
         // Try to get API key for the provider
         let api_key_result = config.get_api_key_for_provider(provider);
 
+        log::debug!("Provider: {}", provider);
+
         match (provider.as_str(), api_key_result) {
             // Anthropic with available API key
             ("anthropic", Ok(api_key)) => {
@@ -219,19 +221,28 @@ impl Nixcode {
                 let client = LLMClient::new_openai(llm_config)?;
                 Self::new(project, client, config)
             }
-            // Fallback to environment variables for Anthropic
-            (_, _) => {
-                let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LLMError::MissingAPIKey)?;
-
-                let llm_config = HttpClientOptions::new_anthropic(SecretString::from(api_key));
-
-                let client = LLMClient::new_anthropic(llm_config)?;
+            ("genai", Ok(api_key)) => {
+                let llm_config = HttpClientOptions::new_genai(api_key);
+                let client = LLMClient::new_genai(llm_config)?;
                 Self::new(project, client, config)
             }
+            ("ollama", api_key) => {
+                let api_base = config
+                    .providers
+                    .ollama
+                    .host
+                    .clone()
+                    .unwrap_or("http://127.0.0.1:11434".into());
+                let llm_config =
+                    HttpClientOptions::new_llama(api_base, api_key.unwrap_or_default());
+                let client = LLMClient::new_openai(llm_config)?;
+                Self::new(project, client, config)
+            }
+            (_, _) => todo!(),
         }
     }
 
-    pub fn with_model(mut self, model: &'static LLMModel) -> Self {
+    pub fn with_model(mut self, model: Arc<LLMModel>) -> Self {
         self.model = model;
         self
     }
@@ -246,11 +257,14 @@ impl Nixcode {
         let tools = self.tools.get_enabled_tools(&self.config);
 
         if let Some(content) = project_init_analysis_content {
-            let content = format!("<file path=\".nixcode/init.md\">{}</file>", content);
+            let content = format!(
+                "Project brief:\n<file path=\".nixcode/init.md\">{}</file>",
+                content
+            );
             system_prompt.push(Content::new_text(content));
         }
 
-        let default_temperature = 0.2;
+        let default_temperature = 1.0;
 
         let system = system_prompt
             .iter()
@@ -265,9 +279,8 @@ impl Nixcode {
             Some(system)
         };
 
-        // Create request with parameters based on model capabilities
         let request = LLMRequest {
-            model: self.model,
+            model: self.model.clone(),
             messages,
             system,
             max_tokens: Some(8192),
@@ -275,15 +288,8 @@ impl Nixcode {
             tools: Some(tools),
             stream: true,
             provider_params: None,
-            // stop_sequences: Some(vec![
-            //     "[/function_call]".into(),
-            //     "</function_call>".into(),
-            //     "</|function|>".into(),
-            // ]),
             stop_sequences: None,
         };
-
-        log::debug!("LLMRequest {:?}", request);
 
         let nixcode_event_sender = self.tx.clone();
 
@@ -349,8 +355,8 @@ impl Nixcode {
         &self.config
     }
 
-    pub fn get_model(&self) -> &'static LLMModel {
-        &self.model
+    pub fn get_model(&self) -> Arc<LLMModel> {
+        self.model.clone()
     }
 
     pub fn get_project(&self) -> Arc<Project> {

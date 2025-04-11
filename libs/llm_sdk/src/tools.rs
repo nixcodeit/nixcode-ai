@@ -1,16 +1,14 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use schemars::Schema;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Tool {
     pub name: String,
     pub description: String,
-    #[serde(rename = "input_schema")]
-    pub input: Value,
+    pub input: Schema,
 }
 
 impl Tool {
-    pub fn new(name: String, description: String, input: Value) -> Self {
+    pub fn new(name: String, description: String, input: Schema) -> Self {
         Self {
             name,
             description,
@@ -28,7 +26,7 @@ impl Tool {
         self
     }
 
-    pub fn with_input(mut self, input: Value) -> Self {
+    pub fn with_input(mut self, input: Schema) -> Self {
         self.input = input;
         self
     }

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use directories::ProjectDirs;
-use nixcode_llm_sdk::models::llm_model::LLMModel;
+use lazy_static::lazy_static;
+use nixcode_llm_sdk::models::llm_model::{LLMModel, LLMModelBuilder};
 use nixcode_llm_sdk::providers::LLMProvider;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use toml;
 
 /// GitHub-specific settings
@@ -76,6 +78,14 @@ pub struct Providers {
     /// OpenRouter-specific settings
     #[serde(default)]
     pub open_router: ProviderSettings,
+
+    /// OpenRouter-specific settings
+    #[serde(default)]
+    pub genai: ProviderSettings,
+
+    /// OpenRouter-specific settings
+    #[serde(default)]
+    pub ollama: OllamaSettings,
 }
 
 /// Settings for a specific provider
@@ -83,6 +93,21 @@ pub struct Providers {
 pub struct ProviderSettings {
     /// API key for the provider (can use ${ENV_VAR} syntax)
     pub api_key: Option<String>,
+
+    /// API base URL for the provider (can use ${ENV_VAR} syntax)
+    pub api_base: Option<String>,
+}
+
+/// Settings for ollama
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct OllamaSettings {
+    /// Host for the Llama provider
+    pub host: Option<String>,
+
+    /// API key for the Llama provider (can use ${ENV_VAR} syntax)
+    pub api_key: Option<String>,
+
+    pub model_name: Option<String>,
 }
 
 /// Tool configuration
@@ -95,6 +120,27 @@ pub struct ToolsConfig {
     /// Override specific tools (true to enable, false to disable)
     #[serde(default)]
     pub overrides: HashMap<String, bool>,
+}
+
+lazy_static! {
+    pub static ref CUSTOM_LLMS: Mutex<HashMap<String, Arc<LLMModel>>> = Mutex::new(HashMap::new());
+}
+
+pub fn get_custom_llm(providers: LLMProvider, name: &str) -> Arc<LLMModel> {
+    let full_name = format!("{}/{}", providers.name(), name);
+    let mut list = CUSTOM_LLMS.lock().unwrap();
+    if let Some(model) = list.get(&full_name) {
+        return model.clone();
+    }
+
+    let new_model = LLMModelBuilder::new()
+        .provider(providers)
+        .model_name(name)
+        .build();
+
+    list.insert(full_name.clone(), new_model);
+
+    list.get(&full_name).unwrap().clone()
 }
 
 fn default_tools_enabled() -> bool {
@@ -133,13 +179,18 @@ impl Config {
     }
 
     /// Get the model to use for a provider
-    pub fn get_model_for_provider(&self, provider: &str) -> &'static LLMModel {
+    pub fn get_model_for_provider(&self, provider: &str) -> Arc<LLMModel> {
         match provider {
             "anthropic" => LLMProvider::Anthropic.default_model(),
             "openai" => LLMProvider::OpenAI.default_model(),
             "groq" => LLMProvider::Groq.default_model(),
             "open_router" => LLMProvider::OpenRouter.default_model(),
-            _ => LLMProvider::Anthropic.default_model(),
+            "genai" => LLMProvider::GenAI.default_model(),
+            "ollama" => get_custom_llm(
+                LLMProvider::Llama,
+                self.providers.ollama.model_name.clone().unwrap().as_str(),
+            ),
+            _ => panic!("Unknown provider {}", provider),
         }
     }
 
@@ -205,6 +256,18 @@ impl Config {
                     env::var("OPENROUTER_API_KEY").map_err(|_| {
                         anyhow::anyhow!(
                             "OPENROUTER_API_KEY environment variable not set and not configured"
+                        )
+                    })?
+                }
+            }
+            "genai" => {
+                if let Some(key) = &self.providers.genai.api_key {
+                    expand_env_vars(key)
+                } else {
+                    // Fall back to environment variable
+                    env::var("GENAI_API_KEY").map_err(|_| {
+                        anyhow::anyhow!(
+                            "GENAI_API_KEY environment variable not set and not configured"
                         )
                     })?
                 }

@@ -10,7 +10,10 @@ pub fn prepare_request_body(request: &LLMRequest) -> Result<Value, LLMError> {
     let mut body = serde_json::to_value(&request)
         .map_err(|e| LLMError::ParseError(format!("Failed to serialize request: {}", e)))?;
 
-    log::debug!("Request body: {:?}", body);
+    log::debug!(
+        "Request body: {}",
+        serde_json::to_string_pretty(&body).unwrap()
+    );
     // Add cache control for ephemeral content if enabled
     apply_cache_control_to_messages(&mut body)?;
     apply_cache_control_to_system(&mut body, &request)?;

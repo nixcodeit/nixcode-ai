@@ -1,3 +1,4 @@
+use crate::client::genai::client::GenAIClient;
 use crate::config::HttpClientOptions;
 use crate::errors::llm::LLMError;
 use crate::message::common::llm_message::{LLMEvent, LLMRequest};
@@ -6,12 +7,14 @@ use openai::OpenAIClient;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 pub mod anthropic;
+pub mod genai;
 pub mod openai;
 pub mod request;
 
 pub enum LLMClient {
     OpenAI(OpenAIClient),
     Anthropic(AnthropicClient),
+    GenAI(GenAIClient),
 }
 
 impl LLMClient {
@@ -35,10 +38,21 @@ impl LLMClient {
         Ok(LLMClient::Anthropic(client?))
     }
 
+    pub fn new_genai(options: HttpClientOptions) -> anyhow::Result<Self, LLMError> {
+        let client = GenAIClient::new(options);
+
+        if let Err(client) = client {
+            return Err(client);
+        }
+
+        Ok(LLMClient::GenAI(client?))
+    }
+
     pub async fn count_tokens(&self, request: LLMRequest) -> Result<u32, LLMError> {
         match self {
             LLMClient::OpenAI(client) => client.count_tokens(request).await,
             LLMClient::Anthropic(client) => client.count_tokens(request).await,
+            LLMClient::GenAI(client) => client.count_tokens(request).await,
         }
     }
 
@@ -46,6 +60,7 @@ impl LLMClient {
         match self {
             LLMClient::OpenAI(client) => client.send(request).await,
             LLMClient::Anthropic(client) => client.send(request).await,
+            LLMClient::GenAI(client) => client.send(request).await,
         }
     }
 }

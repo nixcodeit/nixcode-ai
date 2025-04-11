@@ -40,4 +40,20 @@ impl HttpClientOptions {
             api_base: Some("https://openrouter.ai/api".to_string()),
         }
     }
+
+    pub fn new_llama(host: String, api_key: SecretString) -> Self {
+        Self {
+            provider: LLMProvider::Llama,
+            api_key,
+            api_base: Some(host),
+        }
+    }
+
+    pub fn new_genai(api_key: SecretString) -> Self {
+        Self {
+            provider: LLMProvider::GenAI,
+            api_key,
+            api_base: Some("https://generativelanguage.googleapis.com".to_string()),
+        }
+    }
 }

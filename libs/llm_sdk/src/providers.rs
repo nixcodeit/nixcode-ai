@@ -1,5 +1,6 @@
-use crate::models::llm_model::{DeepSeekV3, Gpt3oMini, LLMModel, Llama4, Sonnet37};
+use crate::models::llm_model::{DeepSeekV3, Gemini20Flash, Gpt3oMini, LLMModel, Llama4, Sonnet37};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub enum LLMProvider {
@@ -9,6 +10,8 @@ pub enum LLMProvider {
     Gemini,
     Groq,
     OpenRouter,
+    GenAI,
+    Llama,
 }
 
 impl LLMProvider {
@@ -19,6 +22,8 @@ impl LLMProvider {
             LLMProvider::Gemini => "gemini",
             LLMProvider::Groq => "groq",
             LLMProvider::OpenRouter => "open_router",
+            LLMProvider::GenAI => "genai",
+            LLMProvider::Llama => "llama",
         }
     }
 
@@ -29,15 +34,18 @@ impl LLMProvider {
             LLMProvider::Gemini => "Gemini",
             LLMProvider::Groq => "Groq",
             LLMProvider::OpenRouter => "OpenRouter",
+            LLMProvider::GenAI => "GenAI",
+            LLMProvider::Llama => "Llama",
         }
     }
 
-    pub fn default_model(&self) -> &'static LLMModel {
+    pub fn default_model(&self) -> Arc<LLMModel> {
         match self {
-            LLMProvider::Anthropic => &Sonnet37,
-            LLMProvider::OpenAI => &Gpt3oMini,
-            LLMProvider::Groq => &Llama4,
-            LLMProvider::OpenRouter => &DeepSeekV3,
+            LLMProvider::Anthropic => Sonnet37.clone(),
+            LLMProvider::OpenAI => Gpt3oMini.clone(),
+            LLMProvider::Groq => Llama4.clone(),
+            LLMProvider::OpenRouter => DeepSeekV3.clone(),
+            LLMProvider::GenAI => Gemini20Flash.clone(),
             _ => panic!("No default model for provider: {}", self.name()),
         }
     }

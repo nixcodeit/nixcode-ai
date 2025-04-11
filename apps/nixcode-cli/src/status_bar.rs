@@ -6,10 +6,11 @@ use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::layout::{Layout, Margin, Rect};
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Stylize, Widget};
 use ratatui::widgets::Block;
+use std::sync::Arc;
 
 pub struct StatusBar {
     current_mode: InputMode,
-    current_model: Option<&'static LLMModel>,
+    current_model: Option<Arc<LLMModel>>,
 }
 
 impl StatusBar {
@@ -20,7 +21,7 @@ impl StatusBar {
         }
     }
 
-    pub(crate) fn with_model(mut self, model: &'static LLMModel) -> Self {
+    pub(crate) fn with_model(mut self, model: Arc<LLMModel>) -> Self {
         self.current_model = Some(model);
         self
     }
@@ -88,7 +89,8 @@ impl Widget for StatusBar {
                 LLMProvider::OpenAI => Color::Rgb(16, 163, 127),    // Green
                 LLMProvider::Groq => Color::Rgb(255, 165, 0),       // Orange
                 LLMProvider::OpenRouter => Color::Rgb(59, 130, 246), // Blue
-                LLMProvider::Gemini => Color::Rgb(234, 67, 53),     // Red
+                LLMProvider::Gemini | LLMProvider::GenAI => Color::Rgb(234, 67, 53), // Red
+                LLMProvider::Llama => Color::Rgb(255, 255, 255),    // White
             };
 
             let model_line = Line::from(vec![

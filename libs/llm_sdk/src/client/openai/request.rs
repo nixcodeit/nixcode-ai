@@ -32,7 +32,7 @@ pub fn request_to_openai(request: &LLMRequest) -> Value {
                     "function": {
                         "name": tool.name,
                         "description": tool.description,
-                        "parameters": tool.input
+                        "parameters": serde_json::to_value(&tool.input).unwrap()
                     }
                 })
             })

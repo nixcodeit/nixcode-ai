@@ -78,7 +78,26 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn get_schema(&self) -> nixcode_llm_sdk::tools::Tool {
-                let schema = schemars::schema_for!(#param_ident);
+                use schemars::transform::{Transform, RecursiveTransform};
+                use schemars::generate::SchemaSettings;
+                use schemars::Schema;
+
+                let settings = SchemaSettings::default().with(|s| {
+                    s.option_nullable = false;
+                    s.option_add_null_type = false;
+                });
+                let generator = settings.into_generator();
+                let mut schema = generator.into_root_schema_for::<#param_ident>();
+
+                let mut transform = RecursiveTransform(|schema: &mut Schema| {
+                    schema.remove("default");
+                    schema.remove("format");
+                    schema.remove("minimum");
+                    schema.remove("maximum");
+                });
+
+                transform.transform(&mut schema);
+
                 let mut parameters = serde_json::to_value(&schema).unwrap();
                 let mut obj = parameters.as_object_mut().unwrap();
                 if !obj.contains_key("properties") {
@@ -90,7 +109,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                 let tool_name = #tool_name.to_string();
                 let description = #description_expr;
 
-                nixcode_llm_sdk::tools::Tool::new(tool_name, description, parameters)
+                nixcode_llm_sdk::tools::Tool::new(tool_name, description, schema)
             }
 
             async fn execute(&self, params: serde_json::Value, project: std::sync::Arc<crate::project::Project>) -> anyhow::Result<serde_json::Value> {

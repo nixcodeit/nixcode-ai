@@ -1,5 +1,6 @@
 use crate::errors::llm::LLMError;
 use crate::message::content::tools::{ToolResultContent, ToolUseContent};
+use crate::message::genai::{ContentPartToolCall, UsageMetadata};
 use crate::message::openai::{OpenAIMessageToolCall, OpenAIResponse, OpenAIUsage};
 use crate::message::response::MessageResponse;
 use crate::message::usage::AnthropicUsage;
@@ -7,6 +8,7 @@ use crate::models::llm_model::LLMModel;
 use crate::stop_reason::StopReason;
 use crate::tools::Tool;
 use serde_json::Value;
+use std::sync::Arc;
 
 /// Common message structure for all LLM providers
 #[derive(Clone, Default, Debug)]
@@ -84,8 +86,47 @@ impl LLMMessage {
         self
     }
 
+    pub fn add_tool_call(&mut self, tool_call: ToolCall) -> &mut Self {
+        if let Some(tool_calls) = &mut self.tool_calls {
+            tool_calls.push(tool_call);
+        } else {
+            self.tool_calls = Some(vec![tool_call]);
+        }
+
+        self
+    }
+
     pub fn with_usage(&mut self, usage: Usage) -> &mut Self {
         self.usage = Some(usage);
+        self
+    }
+
+    pub fn add_text(&mut self, text: impl Into<String>) -> &mut Self {
+        if let Some(existing_text) = &mut self.text {
+            existing_text.push_str(&text.into());
+        } else {
+            self.text = Some(text.into());
+        }
+        self
+    }
+
+    pub fn add_reasoning(&mut self, reasoning: impl Into<String>) -> &mut Self {
+        if let Some(existing_reasoning) = &mut self.reasoning {
+            existing_reasoning.push_str(&reasoning.into());
+        } else {
+            self.reasoning = Some(reasoning.into());
+        }
+        self
+    }
+
+    pub fn add_usage(&mut self, usage: Usage) -> &mut Self {
+        if let Some(existing_usage) = &mut self.usage {
+            existing_usage.input_tokens += usage.input_tokens;
+            existing_usage.output_tokens += usage.output_tokens;
+            existing_usage.total_tokens += usage.total_tokens;
+        } else {
+            self.usage = Some(usage);
+        }
         self
     }
 }
@@ -142,6 +183,19 @@ impl From<AnthropicUsage> for Usage {
     }
 }
 
+impl From<UsageMetadata> for Usage {
+    fn from(value: UsageMetadata) -> Self {
+        Usage {
+            cache_writes: None,
+            cache_reads: None,
+            input_tokens: value.prompt_token_count.unwrap_or_default(),
+            output_tokens: value.candidates_token_count.unwrap_or_default(),
+            total_tokens: value.total_token_count.unwrap_or_default(),
+            cost: 0.0,
+        }
+    }
+}
+
 /// Tool/function call structure
 #[derive(Clone, Debug)]
 pub struct ToolCall {
@@ -160,6 +214,23 @@ impl From<OpenAIMessageToolCall> for ToolCall {
             arguments: call.function.arguments,
             id: Some(call.id),
         }
+    }
+}
+
+impl From<ContentPartToolCall> for ToolCall {
+    fn from(call: ContentPartToolCall) -> Self {
+        ToolCall {
+            name: call.name,
+            arguments: serde_json::to_string(&call.args).unwrap(),
+            id: None,
+        }
+    }
+}
+
+impl From<&ContentPartToolCall> for ToolCall {
+    fn from(call: &ContentPartToolCall) -> Self {
+        let call = call.clone();
+        Self::from(call)
     }
 }
 
@@ -207,6 +278,7 @@ impl ToolCall {
     pub fn create_response(&self, result: String) -> ToolResult {
         ToolResult {
             result,
+            name: self.name.clone(),
             call_id: self.id.clone(),
         }
     }
@@ -215,6 +287,8 @@ impl ToolCall {
 /// Tool result structure
 #[derive(Clone, Debug)]
 pub struct ToolResult {
+    /// Name of the tool/function
+    pub name: String,
     /// Result of the tool execution (as JSON string)
     pub result: String,
     /// Unique identifier for the tool call (to match with a ToolCall)
@@ -229,6 +303,7 @@ impl TryInto<ToolResultContent> for ToolResult {
         let content = self.result.clone();
 
         Ok(ToolResultContent {
+            name: self.name.clone(),
             content,
             tool_use_id,
         })
@@ -238,6 +313,7 @@ impl TryInto<ToolResultContent> for ToolResult {
 impl Into<ToolResult> for ToolResultContent {
     fn into(self) -> ToolResult {
         ToolResult {
+            name: self.name.clone(),
             result: self.get_content(),
             call_id: Some(self.get_tool_use_id()),
         }
@@ -259,7 +335,7 @@ pub struct Media {
 /// Request structure for LLM API calls
 pub struct LLMRequest {
     /// The model to use for this request
-    pub model: &'static LLMModel,
+    pub model: Arc<LLMModel>,
     /// Messages to send to the LLM
     pub messages: Vec<LLMMessage>,
     /// Optional system prompt
